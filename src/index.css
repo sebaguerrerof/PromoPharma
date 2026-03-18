@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* ── Global smooth rendering ─────────── */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Card hover transitions ─────────── */
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Landing page animations ─────────── */
+.landing-card-hover {
+  transition: all 0.3s ease;
+}
+.landing-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 102, 204, 0.15);
+}
+.landing-fade-in {
+  animation: landingFadeIn 0.6s ease-out forwards;
+}
+.stagger-2 { animation-delay: 0.2s; }
+@keyframes landingFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 0.9; transform: translateX(0); }
+}
+
+/* ── Dialog entrance animation ─────────── */
+.animate-in {
+  animation: dialogIn 0.2s ease-out forwards;
+}
+@keyframes dialogIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Forzar colores al imprimir / exportar PDF ─────────── */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  /* Hide app layout chrome */
+  nav, aside, header, footer,
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Reset page container for full-page printing */
+  .print-page {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    page-break-after: always;
+    break-after: page;
+    overflow: visible !important;
+  }
+
+  .print-page:last-child {
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+}
+
+/* ── Page size classes (applied via JS to <style> tag) ── */
+@page { margin: 15mm; }
+@page size-letter { size: letter portrait; margin: 15mm; }
+@page size-a4 { size: A4 portrait; margin: 15mm; }
+@page size-a5 { size: 148mm 210mm; margin: 10mm; }
+@page size-legal { size: legal portrait; margin: 15mm; }
+@page size-half-letter { size: 140mm 216mm; margin: 10mm; }
