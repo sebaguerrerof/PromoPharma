@@ -894,7 +894,7 @@ const QuoteBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
             fontSize: 56,
             lineHeight: '1',
             color: alpha(qBorder, 0.18),
-            margin: '-10px 0 -30px',
+            margin: '0 0 8px',
           }}
         >
           {qIcon}
@@ -902,7 +902,9 @@ const QuoteBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
       )}
       <Text
         style={{
-          fontFamily: `'${bodyFont}', Arial, sans-serif`,
+          fontFamily: block.style?.fontFamily
+            ? `'${block.style.fontFamily}', Arial, sans-serif`
+            : `'${bodyFont}', Arial, sans-serif`,
           fontSize: quoteFontSize,
           fontStyle: 'italic',
           lineHeight: '1.8',

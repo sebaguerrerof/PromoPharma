@@ -1686,12 +1686,27 @@ const EmailVisualPreview: React.FC<{
         const qBg = block.style?.quoteBg || lightenHex(style.colorPrimary, 0.95);
         const qBorder = block.style?.quoteBorder || style.colorPrimary;
         const qAuthorColor = block.style?.quoteAuthorColor || style.colorPrimary;
+        const qFont = block.style?.fontFamily || bodyFont;
+        const qSize = block.style?.fontSize ? Math.max(parseInt(block.style.fontSize) * 0.6, 9) : 11;
         return wrapPreview(block.id,
           <div style={{ backgroundColor: qBg, borderLeft: `5px solid ${qBorder}`, padding: '18px 22px 14px', borderRadius: 6 }}>
             {qIcon !== 'none' && (
-              <div style={{ fontSize: 30, lineHeight: '1', color: qBorder, opacity: 0.2, marginBottom: -10 }}>{qIcon}</div>
+              <div style={{ fontSize: 30, lineHeight: '1', color: qBorder, opacity: 0.2, marginBottom: 4 }}>{qIcon}</div>
             )}
-            <div style={{ fontStyle: 'italic', fontSize: 11, color: block.style?.color || '#333', lineHeight: 1.7, textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>{block.content || 'Cita...'}</div>
+            <div style={{
+              fontFamily: `'${qFont}', sans-serif`,
+              fontStyle: 'italic',
+              fontSize: qSize,
+              color: block.style?.color || '#333',
+              lineHeight: 1.7,
+              fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400,
+              textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined,
+              textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+            }}>
+              {(block.content || 'Cita...').split('\n').map((line, i) => (
+                <span key={i}>{line}{i < (block.content || '').split('\n').length - 1 && <br />}</span>
+              ))}
+            </div>
             {block.quoteAuthor && (
               <div style={{ fontSize: 8, color: qAuthorColor, fontWeight: 700, marginTop: 8, letterSpacing: '1px', textTransform: 'uppercase' as const }}>— {block.quoteAuthor}</div>
             )}
