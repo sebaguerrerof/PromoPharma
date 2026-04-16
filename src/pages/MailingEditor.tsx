@@ -1276,6 +1276,25 @@ function lightenHex(hex: string, amount: number): string {
   return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
 }
 
+/** Extract embed URL from YouTube / Vimeo links */
+function getVideoEmbedUrl(url?: string): string | null {
+  if (!url) return null;
+  // YouTube: watch?v=ID, youtu.be/ID, /embed/ID, /shorts/ID
+  const ytMatch = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
+  // Vimeo: vimeo.com/ID
+  const vmMatch = url.match(/vimeo\.com\/(\d+)/);
+  if (vmMatch) return `https://player.vimeo.com/video/${vmMatch[1]}`;
+  return null;
+}
+
+/** Get YouTube thumbnail from URL */
+function getYouTubeThumbnail(url?: string): string | null {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null;
+}
+
 /** Darken a hex color toward black */
 function darkenHex(hex: string, amount: number): string {
   const c = hex.replace('#', '');
@@ -1729,23 +1748,60 @@ const EmailVisualPreview: React.FC<{
           </div>,
         block);
       }
-      case 'video':
+      case 'video': {
+        const vFont = block.style?.fontFamily || titleFont;
+        const vSize = block.style?.fontSize ? Math.max(parseInt(block.style.fontSize) * 0.65, 8) : 10;
+        const vColor = block.style?.color || 'rgba(255,255,255,0.85)';
+        const vAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center';
+        const embedUrl = getVideoEmbedUrl(block.videoUrl);
+        const isVideoActive = block.id === activeBlockId || !onBlockClick;
         return wrapPreview(block.id,
           <div style={{ padding: '12px 24px' }}>
-            <div style={{ borderRadius: 4, overflow: 'hidden', background: block.imageUrl ? undefined : `linear-gradient(160deg, ${darkenHex(style.colorPrimary, 0.65)}, #111117, ${darkenHex(style.colorSecondary, 0.6)})`, textAlign: 'center' }}>
-              {block.imageUrl ? (
-                <img src={block.imageUrl} alt="" style={{ width: '100%', display: 'block', borderRadius: 4 }} />
-              ) : (
-                <div style={{ padding: '28px 24px' }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 18, border: '2px solid rgba(255,255,255,0.3)', margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', lineHeight: 1 }}>▶</span>
+            {embedUrl ? (
+              <div style={{ borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+                <iframe
+                  src={embedUrl}
+                  style={{ width: '100%', aspectRatio: '16/9', border: 'none', borderRadius: 4, display: 'block', pointerEvents: isVideoActive ? 'auto' : 'none' }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  title={block.content || 'Video'}
+                />
+                {block.content && (
+                  <div style={{ textAlign: vAlign, padding: '6px 8px', background: 'rgba(0,0,0,0.7)', position: 'absolute', bottom: 0, left: 0, right: 0 }}>
+                    <span style={{
+                      fontFamily: `'${vFont}', sans-serif`,
+                      fontWeight: block.style?.fontWeight === 'bold' ? 900 : 700,
+                      fontSize: vSize,
+                      color: vColor,
+                      letterSpacing: '0.3px',
+                      textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+                    }}>{block.content}</span>
                   </div>
-                  <div style={{ fontFamily: `'${titleFont}', sans-serif`, fontWeight: 700, fontSize: parseInt(block.style?.fontSize || '10') * 0.65 || 10, color: block.style?.color || 'rgba(255,255,255,0.75)', letterSpacing: '0.3px' }}>{block.content || 'Ver video'}</div>
+                )}
+              </div>
+            ) : (
+              <div style={{ borderRadius: 4, overflow: 'hidden', position: 'relative', background: block.imageUrl ? undefined : `linear-gradient(160deg, ${darkenHex(style.colorPrimary, 0.65)}, #111117, ${darkenHex(style.colorSecondary, 0.6)})`, textAlign: vAlign }}>
+                {block.imageUrl && (
+                  <img src={block.imageUrl} alt="" style={{ width: '100%', display: 'block', borderRadius: 4 }} />
+                )}
+                <div style={{ position: block.imageUrl ? 'absolute' : 'relative', inset: 0, display: 'flex', flexDirection: 'column', alignItems: vAlign === 'left' ? 'flex-start' : vAlign === 'right' ? 'flex-end' : 'center', justifyContent: 'center', padding: '28px 24px', background: block.imageUrl ? 'rgba(0,0,0,0.45)' : undefined, borderRadius: 4 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 18, border: '2px solid rgba(255,255,255,0.5)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 1 }}>▶</span>
+                  </div>
+                  <div style={{
+                    fontFamily: `'${vFont}', sans-serif`,
+                    fontWeight: block.style?.fontWeight === 'bold' ? 900 : 700,
+                    fontSize: vSize,
+                    color: vColor,
+                    letterSpacing: '0.3px',
+                    textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+                  }}>{block.content || 'Ver video'}</div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>,
         block);
+      }
       case 'columns': {
         const cols = (block.content || '').split('|||').map((c) => c.trim());
         return wrapPreview(block.id,
@@ -2818,9 +2874,24 @@ const BlockEditor: React.FC<{
                 className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
                 placeholder="https://youtube.com/watch?v=..."
               />
+              {getVideoEmbedUrl(block.videoUrl) && (
+                <div className="mt-2 rounded-xl overflow-hidden border border-gray-100">
+                  <iframe
+                    src={getVideoEmbedUrl(block.videoUrl)!}
+                    className="w-full aspect-video border-none"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title="Video preview"
+                  />
+                </div>
+              )}
+              {!getVideoEmbedUrl(block.videoUrl) && block.videoUrl && (
+                <p className="text-[10px] text-amber-500 mt-1">URL no reconocida. Soporta YouTube y Vimeo.</p>
+              )}
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Thumbnail (imagen)</label>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Thumbnail (imagen para email)</label>
+              <p className="text-[9px] text-gray-400 mb-1.5">Los emails no soportan video embebido; se usa esta imagen con enlace.</p>
               <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
               {block.imageUrl ? (
                 <div className="relative group">
@@ -2831,12 +2902,22 @@ const BlockEditor: React.FC<{
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={() => imgInputRef.current?.click()}
-                  className="w-full h-20 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-1.5 hover:border-blue-300 hover:bg-blue-50/30 transition text-[11px] text-gray-400"
-                >
-                  📷 Subir thumbnail
-                </button>
+                <div className="space-y-2">
+                  {getYouTubeThumbnail(block.videoUrl) && (
+                    <button
+                      onClick={() => onChange({ imageUrl: getYouTubeThumbnail(block.videoUrl)! })}
+                      className="w-full py-2 border border-blue-200 bg-blue-50/50 rounded-xl text-[11px] text-blue-600 font-semibold hover:bg-blue-100/50 transition"
+                    >
+                      🎬 Usar thumbnail de YouTube
+                    </button>
+                  )}
+                  <button
+                    onClick={() => imgInputRef.current?.click()}
+                    className="w-full h-20 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center gap-1.5 hover:border-blue-300 hover:bg-blue-50/30 transition text-[11px] text-gray-400"
+                  >
+                    📷 Subir thumbnail
+                  </button>
+                </div>
               )}
             </div>
           </>

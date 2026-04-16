@@ -71,6 +71,13 @@ function alpha(hex: string, a: number): string {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+/** Get YouTube thumbnail from URL */
+function getYouTubeThumbnail(url?: string): string | null {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg` : null;
+}
+
 /** Multiline text helper */
 const Lines: React.FC<{ text: string }> = ({ text }) => {
   const lines = (text || '').split('\n');
@@ -1003,9 +1010,13 @@ const SocialBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
 
 const VideoBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => {
   const videoUrl = block.videoUrl || '#';
-  const thumbnail = block.imageUrl;
+  const thumbnail = block.imageUrl || getYouTubeThumbnail(block.videoUrl);
   const txtColor = block.style?.color || alpha('#ffffff', 0.85);
   const txtSize = parseInt(block.style?.fontSize || '16') || 16;
+  const vFont = block.style?.fontFamily
+    ? `'${block.style.fontFamily}', Arial, sans-serif`
+    : `'${titleFont}', Arial, sans-serif`;
+  const vAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center';
 
   return (
     <Section style={{ padding: bPad(block, 24, 48, 24, 48) }}>
@@ -1017,19 +1028,63 @@ const VideoBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => {
             background: thumbnail
               ? undefined
               : `linear-gradient(160deg, ${darken(style.colorPrimary, 0.65)} 0%, #111117 60%, ${darken(style.colorSecondary, 0.6)} 100%)`,
-            textAlign: 'center',
+            textAlign: vAlign,
           }}
         >
           {thumbnail ? (
-            <Img
-              src={thumbnail}
-              alt={block.content || 'Video'}
-              style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 6 }}
-            />
+            /* Thumbnail with overlay */
+            <Section style={{ position: 'relative' }}>
+              <Img
+                src={thumbnail}
+                alt={block.content || 'Video'}
+                style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 6 }}
+              />
+              {/* Dark overlay with play button + title */}
+              <Section style={{
+                position: 'absolute',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.45)',
+                textAlign: vAlign,
+                padding: '40px 32px',
+              }}>
+                <table cellPadding="0" cellSpacing="0" role="presentation" style={{ margin: vAlign === 'center' ? '0 auto 16px' : vAlign === 'right' ? '0 0 16px auto' : '0 auto 16px 0' }}>
+                  <tbody>
+                    <tr>
+                      <td
+                        style={{
+                          width: 72,
+                          height: 72,
+                          borderRadius: 36,
+                          border: `2px solid ${alpha('#ffffff', 0.5)}`,
+                          textAlign: 'center',
+                          verticalAlign: 'middle',
+                        }}
+                      >
+                        <Text style={{ fontSize: 28, color: alpha('#ffffff', 0.9), margin: 0, lineHeight: '1' }}>▶</Text>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <Heading
+                  as="h3"
+                  style={{
+                    fontFamily: vFont,
+                    fontSize: txtSize,
+                    color: txtColor,
+                    fontWeight: block.style?.fontWeight === 'bold' ? 900 : 700,
+                    margin: 0,
+                    letterSpacing: '0.5px',
+                    textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+                  }}
+                >
+                  {block.content || 'Ver video'}
+                </Heading>
+              </Section>
+            </Section>
           ) : (
             <Section style={{ padding: '56px 40px' }}>
               {/* Play circle — bordered ring, not filled */}
-              <table cellPadding="0" cellSpacing="0" role="presentation" style={{ margin: '0 auto 16px' }}>
+              <table cellPadding="0" cellSpacing="0" role="presentation" style={{ margin: vAlign === 'center' ? '0 auto 16px' : vAlign === 'right' ? '0 0 16px auto' : '0 auto 16px 0' }}>
                 <tbody>
                   <tr>
                     <td
@@ -1050,12 +1105,13 @@ const VideoBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => {
               <Heading
                 as="h3"
                 style={{
-                  fontFamily: `'${titleFont}', Arial, sans-serif`,
+                  fontFamily: vFont,
                   fontSize: txtSize,
                   color: txtColor,
-                  fontWeight: 700,
+                  fontWeight: block.style?.fontWeight === 'bold' ? 900 : 700,
                   margin: 0,
                   letterSpacing: '0.5px',
+                  textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
                 }}
               >
                 {block.content || 'Ver video'}
