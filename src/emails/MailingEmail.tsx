@@ -465,13 +465,17 @@ const HeroBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) 
 // ═══════════════════════════════════════════════════════════
 
 const TextBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) => {
-  const isTitle = block.style?.fontWeight === 'bold';
-  const baseFontSize = block.style?.fontSize ? parseInt(block.style.fontSize) : isTitle ? 24 : 16;
+  const hl = block.style?.headingLevel || '';
+  const isTitle = hl === 'h1' || hl === 'h2' || hl === 'h3' || hl === 'h4' || block.style?.fontWeight === 'bold';
+  const defaultSize = hl === 'h1' ? 32 : hl === 'h2' ? 24 : hl === 'h3' ? 20 : hl === 'h4' ? 18 : isTitle ? 24 : 16;
+  const baseFontSize = block.style?.fontSize ? parseInt(block.style.fontSize) : defaultSize;
+  const customFont = block.style?.fontFamily;
+  const headingTag = hl === 'h1' ? 'h1' : hl === 'h3' ? 'h3' : hl === 'h4' ? 'h4' : 'h2';
 
   const textStyle: React.CSSProperties = {
-    fontFamily: isTitle
-      ? `'${titleFont}', Arial, sans-serif`
-      : `'${bodyFont}', Arial, sans-serif`,
+    fontFamily: customFont
+      ? `'${customFont}', Arial, sans-serif`
+      : (isTitle ? `'${titleFont}', Arial, sans-serif` : `'${bodyFont}', Arial, sans-serif`),
     fontSize: baseFontSize,
     lineHeight: isTitle ? '1.25' : '1.85',
     color: isTitle ? '#111111' : '#4a4a4a',
@@ -488,15 +492,17 @@ const TextBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) 
       {isTitle ? (
         <>
           {/* Thick accent bar */}
-          <Section
-            style={{
-              width: 48,
-              height: 5,
-              backgroundColor: style.colorPrimary,
-              marginBottom: 20,
-            }}
-          />
-          <Heading as="h2" className="em-title-h" style={textStyle}>
+          {block.style?.accentBar !== 'hide' && (
+            <Section
+              style={{
+                width: 48,
+                height: 5,
+                backgroundColor: block.style?.accentBarColor || style.colorPrimary,
+                marginBottom: 20,
+              }}
+            />
+          )}
+          <Heading as={headingTag} className="em-title-h" style={textStyle}>
             <Lines text={block.content || ''} />
           </Heading>
         </>

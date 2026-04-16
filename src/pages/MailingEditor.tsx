@@ -1525,16 +1525,19 @@ const EmailVisualPreview: React.FC<{
           ),
         block);
       case 'text': {
-        const isTitle = block.style?.fontWeight === 'bold';
-        const baseSize = block.style?.fontSize ? parseInt(block.style.fontSize) : isTitle ? 24 : 16;
-        const previewSize = Math.max(isTitle ? baseSize * 0.55 : baseSize * 0.65, 9);
+        const hl = block.style?.headingLevel || '';
+        const isTitle = hl === 'h1' || hl === 'h2' || hl === 'h3' || hl === 'h4' || block.style?.fontWeight === 'bold';
+        const defaultSize = hl === 'h1' ? 32 : hl === 'h2' ? 24 : hl === 'h3' ? 20 : hl === 'h4' ? 18 : isTitle ? 24 : 16;
+        const baseSize = block.style?.fontSize ? parseInt(block.style.fontSize) : defaultSize;
+        const previewSize = Math.max(baseSize * 0.55, 9);
+        const customFont = block.style?.fontFamily;
         return wrapPreview(block.id,
           <div style={{ padding: isTitle ? '18px 24px 2px' : '4px 24px 10px' }}>
-            {isTitle && (
-              <div style={{ width: 28, height: 3, backgroundColor: style.colorPrimary, marginBottom: 10 }} />
+            {isTitle && block.style?.accentBar !== 'hide' && (
+              <div style={{ width: 28, height: 3, backgroundColor: block.style?.accentBarColor || style.colorPrimary, marginBottom: 10 }} />
             )}
             <div style={{
-              fontFamily: isTitle ? `'${titleFont}', sans-serif` : `'${bodyFont}', sans-serif`,
+              fontFamily: customFont ? `'${customFont}', sans-serif` : (isTitle ? `'${titleFont}', sans-serif` : `'${bodyFont}', sans-serif`),
               fontSize: previewSize,
               lineHeight: isTitle ? 1.25 : 1.85,
               color: block.style?.color || (isTitle ? '#111111' : '#4a4a4a'),
@@ -2978,32 +2981,72 @@ const BlockEditor: React.FC<{
                   ))}
                 </div>
               </div>
-              {/* Bold toggle (for text/columns/quote blocks) */}
+              {/* Heading level & bold (for text/columns/quote blocks) */}
               {['text', 'columns', 'quote'].includes(block.type) && (
                 <div>
-                  <label className="block text-[10px] text-gray-400 mb-1">Peso de fuente</label>
+                  <label className="block text-[10px] text-gray-400 mb-1">Tipo de texto</label>
                   <div className="flex gap-1">
-                    <button
-                      onClick={() => { const s = { ...block.style }; delete s.fontWeight; onChange({ style: s }); }}
-                      className={`flex-1 py-1.5 text-[10px] font-normal rounded-lg border transition ${
-                        block.style?.fontWeight !== 'bold'
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
-                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      Normal
-                    </button>
-                    <button
-                      onClick={() => onChange({ style: { ...block.style, fontWeight: 'bold' } })}
-                      className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg border transition ${
-                        block.style?.fontWeight === 'bold'
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
-                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      <b>Negrita / Título</b>
-                    </button>
+                    {([['', 'Párrafo'], ['h1', 'H1'], ['h2', 'H2'], ['h3', 'H3'], ['h4', 'H4']] as const).map(([level, label]) => {
+                      const currentLevel = block.style?.headingLevel || '';
+                      const isActive = currentLevel === level;
+                      return (
+                        <button
+                          key={level || 'p'}
+                          onClick={() => {
+                            const s = { ...block.style };
+                            if (level) {
+                              s.headingLevel = level;
+                              s.fontWeight = 'bold';
+                              if (!s.fontSize) {
+                                s.fontSize = level === 'h1' ? '32' : level === 'h2' ? '24' : level === 'h3' ? '20' : '18';
+                              }
+                            } else {
+                              delete s.headingLevel;
+                              delete s.fontWeight;
+                              delete s.fontSize;
+                            }
+                            onChange({ style: s });
+                          }}
+                          className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${
+                            isActive
+                              ? 'bg-blue-50 border-blue-300 text-blue-700'
+                              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
                   </div>
+                </div>
+              )}
+              {/* Accent bar toggle + color (only when heading selected) */}
+              {['text', 'columns', 'quote'].includes(block.type) && (block.style?.headingLevel || block.style?.fontWeight === 'bold') && (
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[10px] text-gray-500 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={block.style?.accentBar !== 'hide'}
+                      onChange={(e) => {
+                        const s = { ...block.style };
+                        if (e.target.checked) { delete s.accentBar; } else { s.accentBar = 'hide'; }
+                        onChange({ style: s });
+                      }}
+                      className="accent-blue-500"
+                    />
+                    Barra decorativa
+                  </label>
+                  {block.style?.accentBar !== 'hide' && (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="color"
+                        value={block.style?.accentBarColor || style.colorPrimary}
+                        onChange={(e) => onChange({ style: { ...block.style, accentBarColor: e.target.value } })}
+                        className="w-6 h-6 rounded border border-gray-200 cursor-pointer"
+                      />
+                      <span className="text-[9px] text-gray-400">Color</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
