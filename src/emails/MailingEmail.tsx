@@ -592,7 +592,9 @@ const BulletsBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
   const fontSize = block.style?.fontSize ? parseInt(block.style.fontSize) : 14;
   const bulletStyle = block.style?.bulletStyle || 'number';
   const badgeBg = block.style?.bulletBadgeBg || style.colorPrimary;
-  const itemBg = block.style?.bulletItemBg;
+  const itemBg = block.style?.bulletItemBg || lighten(badgeBg, 0.96);
+  const customFont = block.style?.fontFamily;
+  const fontFam = customFont ? `'${customFont}', Arial, sans-serif` : `'${bodyFont}', Arial, sans-serif`;
 
   const getBadgeText = (i: number) => {
     switch (bulletStyle) {
@@ -619,17 +621,17 @@ const BulletsBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
               <Column
                 style={{
                   width: 52,
-                  backgroundColor: i === 0 ? badgeBg : lighten(badgeBg, 0.92),
+                  backgroundColor: badgeBg,
                   verticalAlign: 'middle',
                   textAlign: 'center',
                 }}
               >
                 <Text
                   style={{
-                    fontFamily: `'${bodyFont}', Arial, sans-serif`,
+                    fontFamily: fontFam,
                     fontSize: bulletStyle === 'bullet' ? 20 : 14,
                     fontWeight: 800,
-                    color: i === 0 ? '#ffffff' : badgeBg,
+                    color: '#ffffff',
                     margin: 0,
                     padding: '14px 0',
                     letterSpacing: '-0.5px',
@@ -642,18 +644,18 @@ const BulletsBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
             <Column
               style={{
                 verticalAlign: 'middle',
-                backgroundColor: itemBg || (i === 0 ? lighten(badgeBg, 0.96) : '#f9f9fb'),
+                backgroundColor: itemBg,
                 padding: '14px 20px',
               }}
             >
               <Text
                 style={{
-                  fontFamily: `'${bodyFont}', Arial, sans-serif`,
+                  fontFamily: fontFam,
                   fontSize,
                   lineHeight: '1.6',
                   color: textColor,
                   margin: 0,
-                  fontWeight: i === 0 ? 600 : 400,
+                  fontWeight: block.style?.fontWeight === 'bold' ? 600 : 400,
                   textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined,
                   textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
                 }}

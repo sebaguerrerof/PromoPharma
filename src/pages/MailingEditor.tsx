@@ -1578,7 +1578,9 @@ const EmailVisualPreview: React.FC<{
       case 'bullets': {
         const bStyle = block.style?.bulletStyle || 'number';
         const badgeBg = block.style?.bulletBadgeBg || style.colorPrimary;
-        const itemBg = block.style?.bulletItemBg;
+        const itemBg = block.style?.bulletItemBg || lightenHex(badgeBg, 0.96);
+        const bulletFont = block.style?.fontFamily || bodyFont;
+        const bulletFontSize = block.style?.fontSize ? Math.max(parseInt(block.style.fontSize) * 0.65, 8) : 10;
         const getBadge = (i: number) => {
           switch (bStyle) {
             case 'bullet': return '•';
@@ -1592,12 +1594,19 @@ const EmailVisualPreview: React.FC<{
             {(block.content || '• Item 1\n• Item 2').split('\n').filter(Boolean).map((line, i) => (
               <div key={i} style={{ display: 'flex', marginBottom: 4, borderRadius: 4, overflow: 'hidden' }}>
                 {bStyle !== 'none' && (
-                  <div style={{ width: 30, backgroundColor: i === 0 ? badgeBg : lightenHex(badgeBg, 0.92), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: '6px 0' }}>
-                    <span style={{ fontSize: bStyle === 'bullet' ? 12 : 8, fontWeight: 800, color: i === 0 ? '#fff' : badgeBg, letterSpacing: '-0.3px' }}>{getBadge(i)}</span>
+                  <div style={{ width: 30, backgroundColor: badgeBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: '6px 0' }}>
+                    <span style={{ fontSize: bStyle === 'bullet' ? 12 : 8, fontWeight: 800, color: '#fff', letterSpacing: '-0.3px' }}>{getBadge(i)}</span>
                   </div>
                 )}
-                <div style={{ flex: 1, padding: '6px 10px', backgroundColor: itemBg || (i === 0 ? lightenHex(badgeBg, 0.96) : '#f9f9fb') }}>
-                  <span style={{ fontSize: 10, color: block.style?.color || '#333', lineHeight: 1.5, fontWeight: i === 0 ? 600 : 400 }}>{line.replace(/^[•\-]\s*/, '')}</span>
+                <div style={{ flex: 1, padding: '6px 10px', backgroundColor: itemBg, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined }}>
+                  <span style={{
+                    fontFamily: `'${bulletFont}', sans-serif`,
+                    fontSize: bulletFontSize,
+                    color: block.style?.color || '#333',
+                    lineHeight: 1.5,
+                    fontWeight: block.style?.fontWeight === 'bold' ? 600 : 400,
+                    textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+                  }}>{line.replace(/^[•\-]\s*/, '')}</span>
                 </div>
               </div>
             ))}
