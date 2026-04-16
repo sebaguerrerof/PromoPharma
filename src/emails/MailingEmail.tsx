@@ -281,6 +281,8 @@ const HeaderBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }
   const logoSrc = block.imageUrl || style.logoUrl;
   const headerBg = block.backgroundColor || undefined;
   const hasCustomBg = !!block.backgroundColor;
+  const logoX = parseInt(block.style?.logoX || '0') || 0;
+  const logoY = parseInt(block.style?.logoY || '0') || 0;
   const bgStyle: React.CSSProperties = block.backgroundImage
     ? {
         backgroundImage: `url(${block.backgroundImage})`,
@@ -308,48 +310,53 @@ const HeaderBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }
       <Section className="em-pad" style={{ padding: bPad(block, 32, 48, 28, 48) }}>
         <Row>
           <Column style={{ verticalAlign: 'middle' }}>
-            {logoSrc && (
-              <Img
-                src={logoSrc}
-                alt="Logo"
-                height={42}
+            <div style={{ position: 'relative', left: logoX * 2, top: logoY * 2, display: 'inline-block' }}>
+              {logoSrc && (
+                <Img
+                  src={logoSrc}
+                  alt="Logo"
+                  height={42}
+                  style={{
+                    height: 42,
+                    width: 'auto',
+                    display: 'block',
+                    marginBottom: 16,
+                  }}
+                />
+              )}
+              <Heading
+                as="h1"
                 style={{
-                  height: 42,
-                  width: 'auto',
-                  display: 'block',
-                  marginBottom: 16,
+                  fontFamily: `'${block.style?.fontFamily || titleFont}', Arial, sans-serif`,
+                  fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) : 22,
+                  fontWeight: 800,
+                  color: block.style?.color || '#ffffff',
+                  margin: 0,
+                  letterSpacing: '-0.3px',
+                  textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || 'uppercase' as const,
+                  textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined,
                 }}
-              />
-            )}
-            <Heading
-              as="h1"
-              style={{
-                fontFamily: `'${titleFont}', Arial, sans-serif`,
-                fontSize: 22,
-                fontWeight: 800,
-                color: '#ffffff',
-                margin: 0,
-                letterSpacing: '-0.3px',
-                textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || 'uppercase' as const,
-              }}
-            >
-              {block.content || ''}
-            </Heading>
+              >
+                {block.content || ''}
+              </Heading>
+            </div>
           </Column>
-          <Column align="right" style={{ verticalAlign: 'bottom' }}>
-            <Text
-              style={{
-                margin: 0,
-                fontSize: 11,
-                color: alpha('#ffffff', 0.35),
-                fontFamily: `'${bodyFont}', Arial, sans-serif`,
-                letterSpacing: '1.5px',
-                textTransform: 'uppercase' as const,
-              }}
-            >
-              {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-            </Text>
-          </Column>
+          {block.style?.headerDate !== '__hide__' && (
+            <Column align="right" style={{ verticalAlign: 'bottom' }}>
+              <Text
+                style={{
+                  margin: 0,
+                  fontSize: 11,
+                  color: alpha('#ffffff', 0.35),
+                  fontFamily: `'${bodyFont}', Arial, sans-serif`,
+                  letterSpacing: '1.5px',
+                  textTransform: 'uppercase' as const,
+                }}
+              >
+                {block.style?.headerDate || new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+              </Text>
+            </Column>
+          )}
         </Row>
       </Section>
     </Section>

@@ -1228,6 +1228,7 @@ const StepEditor: React.FC<{
               activeBlockId={activeBlockId}
               onBlockClick={(id) => onActiveBlockChange(id)}
               onReorder={onReorderBlocks}
+              onBlockChange={onBlockChange}
             />
           </div>
         </div>
@@ -1306,13 +1307,100 @@ const SortablePreviewBlock: React.FC<{
   );
 };
 
+// ── Draggable Logo sub-component for header ──────────────
+
+const DraggableLogo: React.FC<{
+  logoUrl?: string;
+  text: string;
+  titleFont: string;
+  offsetX: number;
+  offsetY: number;
+  textStyle?: Record<string, string>;
+  onDragEnd: (x: number, y: number) => void;
+}> = ({ logoUrl, text, titleFont, offsetX, offsetY, textStyle, onDragEnd }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef({ mx: 0, my: 0, ox: offsetX, oy: offsetY });
+  const [pos, setPos] = useState({ x: offsetX, y: offsetY });
+
+  // Sync with external offset changes
+  useEffect(() => {
+    if (!dragging) setPos({ x: offsetX, y: offsetY });
+  }, [offsetX, offsetY, dragging]);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setDragging(true);
+    dragStart.current = { mx: e.clientX, my: e.clientY, ox: pos.x, oy: pos.y };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!dragging) return;
+    const dx = e.clientX - dragStart.current.mx;
+    const dy = e.clientY - dragStart.current.my;
+    setPos({ x: dragStart.current.ox + dx, y: dragStart.current.oy + dy });
+  };
+
+  const onPointerUp = () => {
+    if (!dragging) return;
+    setDragging(false);
+    onDragEnd(pos.x, pos.y);
+  };
+
+  return (
+    <div
+      ref={ref}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{
+        position: 'relative',
+        left: pos.x,
+        top: pos.y,
+        display: 'inline-block',
+        cursor: dragging ? 'grabbing' : 'grab',
+        userSelect: 'none',
+        touchAction: 'none',
+        border: dragging ? '1px dashed rgba(255,255,255,0.5)' : '1px dashed transparent',
+        borderRadius: 4,
+        padding: 2,
+        transition: dragging ? 'none' : 'border-color 0.2s',
+      }}
+      title="Arrastra para reposicionar el logo"
+    >
+      {logoUrl && (
+        <img src={logoUrl} alt="" style={{ height: 24, width: 'auto', objectFit: 'contain', display: 'block', marginBottom: text ? 8 : 0, pointerEvents: 'none' }} />
+      )}
+      {text && (
+        <span style={{
+          color: textStyle?.color || '#fff',
+          fontFamily: `'${textStyle?.fontFamily || titleFont}', sans-serif`,
+          fontWeight: 800,
+          fontSize: textStyle?.fontSize ? Math.round(parseInt(textStyle.fontSize) * 0.55) : 12,
+          letterSpacing: '-0.2px',
+          textTransform: (textStyle?.textTransform as React.CSSProperties['textTransform']) || 'uppercase',
+          textAlign: (textStyle?.textAlign as React.CSSProperties['textAlign']) || 'left',
+          display: 'block',
+          pointerEvents: 'none',
+        }}>
+          {text}
+        </span>
+      )}
+    </div>
+  );
+};
+
 const EmailVisualPreview: React.FC<{
   blocks: MailingBlockContent[];
   style: MailingProject['style'];
   activeBlockId?: string | null;
   onBlockClick?: (id: string) => void;
   onReorder?: (activeId: string, overId: string) => void;
-}> = ({ blocks, style, activeBlockId, onBlockClick, onReorder }) => {
+  onBlockChange?: (blockId: string, updates: Partial<MailingBlockContent>) => void;
+}> = ({ blocks, style, activeBlockId, onBlockClick, onReorder, onBlockChange }) => {
   const bodyFont = style.fontBody || 'Inter';
   const titleFont = style.fontTitle || 'Inter';
 
@@ -1353,16 +1441,16 @@ const EmailVisualPreview: React.FC<{
     return inner;
   };
 
-  const wrapPreview = (id: string, el: React.ReactNode, block: MailingBlockContent) => {
-    const hasBg = block.backgroundColor || block.backgroundImage;
+  const wrapPreview = (id: string, el: React.ReactNode, block: MailingBlockContent, skipBg = false) => {
+    const hasBg = !skipBg && (block.backgroundColor || block.backgroundImage);
     const hasPad = block.paddingTop != null || block.paddingBottom != null || block.paddingLeft != null || block.paddingRight != null;
     const inner = (hasBg || hasPad) ? (
       <div
         style={{
-          backgroundColor: block.backgroundColor || undefined,
-          backgroundImage: block.backgroundImage ? `url(${block.backgroundImage})` : undefined,
-          backgroundSize: block.backgroundImage ? 'cover' : undefined,
-          backgroundPosition: block.backgroundImage ? 'center' : undefined,
+          backgroundColor: !skipBg ? (block.backgroundColor || undefined) : undefined,
+          backgroundImage: !skipBg && block.backgroundImage ? `url(${block.backgroundImage})` : undefined,
+          backgroundSize: !skipBg && block.backgroundImage ? 'cover' : undefined,
+          backgroundPosition: !skipBg && block.backgroundImage ? 'center' : undefined,
           paddingTop: block.paddingTop != null ? block.paddingTop * 0.5 : undefined,
           paddingBottom: block.paddingBottom != null ? block.paddingBottom * 0.5 : undefined,
           paddingLeft: block.paddingLeft != null ? block.paddingLeft * 0.5 : undefined,
@@ -1378,32 +1466,41 @@ const EmailVisualPreview: React.FC<{
   const renderBlock = (block: MailingBlockContent) => {
     switch (block.type) {
       case 'header': {
-        const headerBg = block.backgroundColor
-          ? { backgroundColor: block.backgroundColor }
-          : { background: `linear-gradient(135deg, ${style.colorPrimary}, ${style.colorSecondary})` };
+        // Header manages its own background — backgroundColor and backgroundImage take priority over brand gradient
         const headerStyle: React.CSSProperties = block.backgroundImage
           ? { backgroundImage: `url(${block.backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: block.backgroundColor || style.colorPrimary }
-          : headerBg;
+          : block.backgroundColor
+            ? { backgroundColor: block.backgroundColor }
+            : { background: `linear-gradient(135deg, ${style.colorPrimary}, ${style.colorSecondary})` };
+        const logoX = parseFloat(block.style?.logoX || '0');
+        const logoY = parseFloat(block.style?.logoY || '0');
+        const hasLogo = !!(block.imageUrl || style.logoUrl);
         return wrapPreview(block.id,
           <div style={headerStyle}>
-            {!block.backgroundImage && (
-              <div style={{ height: 3, background: block.backgroundColor ? `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary})` : 'linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.25), rgba(255,255,255,0.1))' }} />
+            {!block.backgroundImage && !block.backgroundColor && (
+              <div style={{ height: 3, background: 'linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.25), rgba(255,255,255,0.1))' }} />
             )}
-            <div style={{ padding: '18px 20px 16px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
-              <div>
-                {(block.imageUrl || style.logoUrl) && (
-                  <img src={block.imageUrl || style.logoUrl} alt="" style={{ height: 24, width: 'auto', objectFit: 'contain', display: 'block', marginBottom: 8 }} />
-                )}
-                <span style={{ color: '#fff', fontFamily: `'${titleFont}', sans-serif`, fontWeight: 800, fontSize: 12, letterSpacing: '-0.2px', textTransform: 'uppercase' as const }}>
-                  {block.content || ''}
+            <div style={{ padding: '18px 20px 16px', position: 'relative', minHeight: 60, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'left' }}>
+              {/* Logo + text as draggable sub-component */}
+              <DraggableLogo
+                logoUrl={hasLogo ? (block.imageUrl || style.logoUrl) : undefined}
+                text={block.content || ''}
+                titleFont={titleFont}
+                offsetX={logoX}
+                offsetY={logoY}
+                textStyle={block.style}
+                onDragEnd={(x, y) => {
+                  onBlockChange?.(block.id, { style: { ...block.style, logoX: String(Math.round(x)), logoY: String(Math.round(y)) } });
+                }}
+              />
+              {block.style?.headerDate !== '__hide__' && (
+                <span style={{ position: 'absolute', right: 20, bottom: 16, color: 'rgba(255,255,255,.25)', fontSize: 7, fontFamily: `'${bodyFont}', sans-serif`, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
+                  {block.style?.headerDate || new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}
                 </span>
-              </div>
-              <span style={{ color: 'rgba(255,255,255,.25)', fontSize: 7, fontFamily: `'${bodyFont}', sans-serif`, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
-                {new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}
-              </span>
+              )}
             </div>
           </div>,
-        block);
+        block, true);
       }
       case 'hero':
         return wrapPreview(block.id,
@@ -1643,15 +1740,21 @@ const EmailVisualPreview: React.FC<{
     }
   };
 
+  // Check if first block is a header with custom background — if so, skip the top accent strip
+  const firstBlock = blocks[0];
+  const headerHasCustomBg = firstBlock?.type === 'header' && (firstBlock.backgroundColor || firstBlock.backgroundImage);
+
   return (
     <div style={{ fontFamily: `'${bodyFont}', Arial, sans-serif`, backgroundColor: '#0d0d11', padding: '0 0 12px' }}>
-      {/* Top accent strip */}
-      <div
-        style={{
-          height: 4,
-          background: `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary}, ${style.colorPrimary})`,
-        }}
-      />
+      {/* Top accent strip — hidden when header has custom bg */}
+      {!headerHasCustomBg && (
+        <div
+          style={{
+            height: 4,
+            background: `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary}, ${style.colorPrimary})`,
+          }}
+        />
+      )}
 
       {/* Email body container */}
       <div style={{ backgroundColor: style.colorBackground ?? '#fff' }}>
@@ -2300,6 +2403,80 @@ const BlockEditor: React.FC<{
                 <span>🖼️</span> Subir imagen de fondo
               </button>
             </div>
+
+            {/* Logo position (drag & drop) */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">
+                Posición del logo
+                <span className="font-normal text-gray-400 ml-1">(arrastra en el preview)</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-0.5">X (horizontal)</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      value={parseInt(block.style?.logoX || '0')}
+                      onChange={(e) => onChange({ style: { ...block.style, logoX: e.target.value || '0' } })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+                    />
+                    <span className="text-[10px] text-gray-400">px</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-0.5">Y (vertical)</label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      value={parseInt(block.style?.logoY || '0')}
+                      onChange={(e) => onChange({ style: { ...block.style, logoY: e.target.value || '0' } })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+                    />
+                    <span className="text-[10px] text-gray-400">px</span>
+                  </div>
+                </div>
+              </div>
+              {(block.style?.logoX !== '0' && block.style?.logoX) || (block.style?.logoY !== '0' && block.style?.logoY) ? (
+                <button
+                  onClick={() => onChange({ style: { ...block.style, logoX: '0', logoY: '0' } })}
+                  className="text-[10px] text-gray-400 hover:text-red-500 mt-1.5 transition"
+                >
+                  ↩ Restablecer posición
+                </button>
+              ) : null}
+            </div>
+
+            {/* Header date text */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Texto de fecha</label>
+              <div className="flex items-center gap-2">
+                <input
+                  value={block.style?.headerDate === '__hide__' ? '' : (block.style?.headerDate || '')}
+                  onChange={(e) => onChange({ style: { ...block.style, headerDate: e.target.value } })}
+                  placeholder={new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}
+                  disabled={block.style?.headerDate === '__hide__'}
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 text-[11px] focus:outline-none focus:border-blue-400 disabled:opacity-40 disabled:bg-gray-50"
+                />
+              </div>
+              <div className="flex items-center gap-3 mt-1.5">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={block.style?.headerDate !== '__hide__'}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        const s = { ...block.style }; delete s.headerDate; onChange({ style: s });
+                      } else {
+                        onChange({ style: { ...block.style, headerDate: '__hide__' } });
+                      }
+                    }}
+                    className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-[10px] text-gray-500">Mostrar fecha</span>
+                </label>
+                <p className="text-[10px] text-gray-400">Vacío = fecha automática</p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2760,7 +2937,11 @@ const BlockEditor: React.FC<{
                   {([['left', '≡ Izq'], ['center', '≡ Centro'], ['right', '≡ Der']] as const).map(([align, label]) => (
                     <button
                       key={align}
-                      onClick={() => onChange({ style: { ...block.style, textAlign: align } })}
+                      onClick={() => {
+                        const newStyle: Record<string, string> = { ...block.style, textAlign: align };
+                        if (block.type === 'header') { newStyle.logoX = '0'; }
+                        onChange({ style: newStyle });
+                      }}
                       className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${
                         (block.style?.textAlign || 'left') === align
                           ? 'bg-blue-50 border-blue-300 text-blue-700'
