@@ -374,98 +374,130 @@ const HeaderBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }
 // HERO — Cinematic full section with bold overlay
 // ═══════════════════════════════════════════════════════════
 
-const HeroBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) => (
-  <Section style={{ padding: 0 }}>
-    {block.imageUrl ? (
-      <Img
-        src={block.imageUrl}
-        alt={block.content || ''}
-        width="100%"
-        style={{
-          display: 'block',
-          maxWidth: '100%',
-          width: block.style?.imgWidth === 'auto' ? 'auto' : `${block.style?.imgWidth || '100'}%`,
-          height: block.style?.imgHeight ? parseInt(block.style.imgHeight) : 'auto',
-          objectFit: (block.style?.imgObjectFit as React.CSSProperties['objectFit']) || undefined,
-          borderRadius: parseInt(block.style?.imgBorderRadius || '0'),
-          margin: block.style?.imgAlign === 'left' ? '0 auto 0 0' : block.style?.imgAlign === 'right' ? '0 0 0 auto' : '0 auto',
-        }}
-      />
-    ) : (
-      <Section
-        style={{
-          background: `linear-gradient(165deg, ${darken(style.colorPrimary, 0.7)} 0%, ${darken(style.colorPrimary, 0.45)} 40%, ${darken(style.colorSecondary, 0.5)} 100%)`,
-          padding: bPad(block, 72, 48, 64, 48),
-          textAlign: 'center',
-        }}
-      >
-        {/* Decorative oversized symbol */}
-        <Text
+const HeroBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) => {
+  const heroTitle = block.style?.heroTitle || '';
+  const heroSubtitle = block.style?.heroSubtitle || '';
+  const hasOverlay = !!(heroTitle || heroSubtitle);
+  const hFont = block.style?.fontFamily
+    ? `'${block.style.fontFamily}', Arial, sans-serif`
+    : `'${titleFont}', Arial, sans-serif`;
+  const hSize = block.style?.fontSize ? parseInt(block.style.fontSize) : 36;
+  const hColor = block.style?.color || '#ffffff';
+  const hAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center';
+  const hShadow = block.style?.imgShadow || 'none';
+  const heroShadowMap: Record<string, string> = { none: 'none', sm: '0 2px 8px rgba(0,0,0,0.08)', md: '0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)', lg: '0 16px 48px rgba(0,0,0,0.18), 0 4px 12px rgba(0,0,0,0.08)' };
+  const hBorder = (!block.style?.imgBorder || block.style.imgBorder === 'none')
+    ? undefined
+    : block.style.imgBorder.includes('solid') && !block.style.imgBorder.includes('#')
+      ? block.style.imgBorder.replace('solid', `solid ${block.style?.imgBorderColor || '#d1d5db'}`)
+      : block.style.imgBorder;
+
+  return (
+    <Section style={{ padding: 0 }}>
+      {block.imageUrl ? (
+        <Section style={{ position: 'relative' }}>
+          <Img
+            src={block.imageUrl}
+            alt={block.content || ''}
+            width="100%"
+            style={{
+              display: 'block',
+              maxWidth: '100%',
+              width: block.style?.imgWidth === 'auto' ? 'auto' : `${block.style?.imgWidth || '100'}%`,
+              height: block.style?.imgHeight ? parseInt(block.style.imgHeight) : 'auto',
+              objectFit: (block.style?.imgObjectFit as React.CSSProperties['objectFit']) || undefined,
+              borderRadius: parseInt(block.style?.imgBorderRadius || '0'),
+              margin: block.style?.imgAlign === 'left' ? '0 auto 0 0' : block.style?.imgAlign === 'right' ? '0 0 0 auto' : '0 auto',
+              boxShadow: heroShadowMap[hShadow] || 'none',
+              border: hBorder,
+            }}
+          />
+          {hasOverlay && (
+            <Section style={{
+              position: 'absolute',
+              bottom: 0, left: 0, right: 0,
+              background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)',
+              padding: '48px 40px 32px',
+              textAlign: hAlign,
+              borderRadius: `0 0 ${block.style?.imgBorderRadius || '0'}px ${block.style?.imgBorderRadius || '0'}px`,
+            }}>
+              {heroTitle && (
+                <Heading as="h2" className="em-hero-h" style={{
+                  fontFamily: hFont,
+                  fontSize: hSize,
+                  fontWeight: 900,
+                  color: hColor,
+                  margin: '0 0 4px',
+                  letterSpacing: '-0.8px',
+                  lineHeight: '1.15',
+                  textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+                }}>
+                  {heroTitle}
+                </Heading>
+              )}
+              {heroSubtitle && (
+                <Text style={{
+                  fontFamily: `'${bodyFont}', Arial, sans-serif`,
+                  fontSize: Math.round(hSize * 0.45),
+                  color: alpha('#ffffff', 0.75),
+                  margin: 0,
+                }}>
+                  {heroSubtitle}
+                </Text>
+              )}
+            </Section>
+          )}
+        </Section>
+      ) : (
+        <Section
           style={{
-            fontSize: 120,
-            lineHeight: '1',
-            color: alpha('#ffffff', 0.04),
-            margin: '-20px 0 -50px',
-            fontWeight: 900,
-            fontFamily: `'${titleFont}', Arial, sans-serif`,
+            background: `linear-gradient(165deg, ${darken(style.colorPrimary, 0.7)} 0%, ${darken(style.colorPrimary, 0.45)} 40%, ${darken(style.colorSecondary, 0.5)} 100%)`,
+            padding: bPad(block, 72, 48, 64, 48),
             textAlign: 'center',
           }}
         >
-          +
-        </Text>
+          <Text
+            style={{
+              fontSize: 120, lineHeight: '1', color: alpha('#ffffff', 0.04),
+              margin: '-20px 0 -50px', fontWeight: 900,
+              fontFamily: `'${titleFont}', Arial, sans-serif`, textAlign: 'center',
+            }}
+          >+</Text>
 
-        {/* Badge pill */}
-        <table cellPadding="0" cellSpacing="0" role="presentation" style={{ margin: '0 auto 20px' }}>
-          <tbody>
-            <tr>
-              <td
-                style={{
-                  padding: '6px 20px',
-                  border: `1px solid ${alpha('#ffffff', 0.2)}`,
-                  borderRadius: 30,
-                  fontSize: 10,
-                  fontFamily: `'${bodyFont}', Arial, sans-serif`,
-                  color: alpha('#ffffff', 0.7),
-                  letterSpacing: '2px',
-                  textTransform: 'uppercase' as const,
-                  textAlign: 'center',
-                }}
-              >
-                DESTACADO
-              </td>
-            </tr>
-          </tbody>
-        </table>
+          <table cellPadding="0" cellSpacing="0" role="presentation" style={{ margin: '0 auto 20px' }}>
+            <tbody><tr>
+              <td style={{
+                padding: '6px 20px', border: `1px solid ${alpha('#ffffff', 0.2)}`,
+                borderRadius: 30, fontSize: 10,
+                fontFamily: `'${bodyFont}', Arial, sans-serif`,
+                color: alpha('#ffffff', 0.7), letterSpacing: '2px',
+                textTransform: 'uppercase' as const, textAlign: 'center',
+              }}>DESTACADO</td>
+            </tr></tbody>
+          </table>
 
-        <Heading
-          as="h2"
-          className="em-hero-h"
-          style={{
-            fontFamily: `'${titleFont}', Arial, sans-serif`,
-            fontSize: 36,
-            fontWeight: 900,
-            color: '#ffffff',
-            margin: '0 0 12px',
-            letterSpacing: '-0.8px',
-            lineHeight: '1.15',
-          }}
-        >
-          {block.content || 'Imagen destacada'}
-        </Heading>
-        <Text
-          style={{
-            fontSize: 14,
-            color: alpha('#ffffff', 0.45),
-            margin: 0,
-            fontFamily: `'${bodyFont}', Arial, sans-serif`,
-          }}
-        >
-          Agrega una imagen para potenciar esta sección
-        </Text>
-      </Section>
-    )}
-  </Section>
-);
+          <Heading as="h2" className="em-hero-h"
+            style={{
+              fontFamily: hFont,
+              fontSize: hSize, fontWeight: 900, color: '#ffffff',
+              margin: '0 0 12px', letterSpacing: '-0.8px', lineHeight: '1.15',
+            }}
+          >
+            {heroTitle || 'Imagen destacada'}
+          </Heading>
+          <Text
+            style={{
+              fontSize: 14, color: alpha('#ffffff', 0.45), margin: 0,
+              fontFamily: `'${bodyFont}', Arial, sans-serif`,
+            }}
+          >
+            Agrega una imagen para potenciar esta sección
+          </Text>
+        </Section>
+      )}
+    </Section>
+  );
+};
 
 // ═══════════════════════════════════════════════════════════
 // TEXT — Editorial with thick accent bar for titles
@@ -554,37 +586,70 @@ const getImgStyle = (block: MailingBlockContent, fallbackShadow?: string): React
     objectFit: (s.imgObjectFit as React.CSSProperties['objectFit']) || undefined,
     borderRadius,
     margin,
-    boxShadow: fallbackShadow && shadow === 'md' ? fallbackShadow : (imgShadowMap[shadow] || imgShadowMap.md),
+    boxShadow: fallbackShadow || (imgShadowMap[shadow] || imgShadowMap.md),
     border,
   };
   return out;
 };
 
-const ImageBlock: React.FC<BlockProps> = ({ block, style }) => (
-  <Section style={{ padding: bPad(block, 24, 48, 24, 48) }}>
-    {block.imageUrl ? (
-      <Img
-        src={block.imageUrl}
-        alt={block.content || ''}
-        style={getImgStyle(block, `0 8px 32px ${alpha(style.colorPrimary, 0.15)}, 0 2px 8px rgba(0,0,0,0.06)`)}
-      />
-    ) : (
-      <Section
-        style={{
-          background: `linear-gradient(160deg, #f8f8fa, #eeeff2)`,
-          height: 220,
-          borderRadius: 4,
-          textAlign: 'center',
-          paddingTop: 90,
-        }}
-      >
-        <Text style={{ color: '#b0b4bc', margin: 0, fontSize: 13, letterSpacing: '0.5px' }}>
-          AGREGAR IMAGEN
-        </Text>
-      </Section>
-    )}
-  </Section>
-);
+const ImageBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
+  const imgShadowColor = block.style?.imgShadowColor || 'rgba(0,0,0,0.12)';
+  const customShadowMap: Record<string, string> = {
+    none: 'none',
+    sm: `0 2px 8px ${imgShadowColor}`,
+    md: `0 8px 32px ${imgShadowColor}, 0 2px 8px rgba(0,0,0,0.06)`,
+    lg: `0 16px 48px ${imgShadowColor}, 0 4px 12px rgba(0,0,0,0.08)`,
+  };
+  const shadow = block.style?.imgShadow || 'md';
+  const fallbackShadow = customShadowMap[shadow] || customShadowMap.md;
+  const imgFont = block.style?.fontFamily
+    ? `'${block.style.fontFamily}', Arial, sans-serif`
+    : `'${bodyFont}', Arial, sans-serif`;
+
+  return (
+    <Section style={{ padding: bPad(block, 24, 48, 24, 48) }}>
+      {block.imageUrl ? (
+        <>
+          <Img
+            src={block.imageUrl}
+            alt={block.content || ''}
+            style={{
+              ...getImgStyle(block, fallbackShadow),
+            }}
+          />
+          {block.content && (
+            <Text style={{
+              fontFamily: imgFont,
+              fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) : 13,
+              color: block.style?.color || '#888888',
+              textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center',
+              fontStyle: 'italic',
+              margin: '10px 0 0',
+              fontWeight: block.style?.fontWeight === 'bold' ? 600 : 400,
+              textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+            }}>
+              {block.content}
+            </Text>
+          )}
+        </>
+      ) : (
+        <Section
+          style={{
+            background: `linear-gradient(160deg, #f8f8fa, #eeeff2)`,
+            height: 220,
+            borderRadius: 4,
+            textAlign: 'center',
+            paddingTop: 90,
+          }}
+        >
+          <Text style={{ color: '#b0b4bc', margin: 0, fontSize: 13, letterSpacing: '0.5px' }}>
+            AGREGAR IMAGEN
+          </Text>
+        </Section>
+      )}
+    </Section>
+  );
+};
 
 // ═══════════════════════════════════════════════════════════
 // BULLETS — Numbered badge cards with colored left accent
@@ -777,102 +842,158 @@ const SpacerBlock: React.FC<BlockProps> = ({ block }) => {
 // FOOTER — Dark with gradient top edge + social pills
 // ═══════════════════════════════════════════════════════════
 
-const FooterBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => (
-  <Section style={{ padding: 0 }}>
-    {/* Gradient top edge */}
-    <Section
-      style={{
-        height: 3,
-        background: `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary}, ${style.colorPrimary})`,
-      }}
-    />
-    <Section
-      style={{
-        backgroundColor: '#111117',
-        padding: bPad(block, 36, 48, 32, 48),
-        textAlign: 'center',
-      }}
-    >
-      {/* Logo */}
-      {style.logoUrl && (
-        <Img
-          src={style.logoUrl}
-          alt=""
-          height={30}
-          style={{
-            height: 30,
-            width: 'auto',
-            display: 'block',
-            margin: '0 auto 20px',
-            opacity: 0.6,
-          }}
-        />
-      )}
+const FooterBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
+  const fLinks = block.socialLinks ?? [{ platform: 'linkedin', url: '#' }, { platform: 'instagram', url: '#' }, { platform: 'web', url: '#' }];
+  const customFont = block.style?.fontFamily;
+  const fontFam = customFont ? `'${customFont}', Arial, sans-serif` : `'${bodyFont}', Arial, sans-serif`;
+  const fBtnColor = block.style?.socialBtnColor || alpha('#ffffff', 0.6);
+  const qrUrl = block.style?.footerQrUrl;
+  const qrLabel = block.style?.footerQrLabel || 'Escanea para más info';
+  const companyInfo = block.style?.footerCompanyInfo;
 
-      {/* Social pills */}
-      <Row style={{ marginBottom: 20 }}>
-        <Column align="center">
-          {['LinkedIn', 'Instagram', 'Web'].map((label) => (
-            <a
-              key={label}
-              href="#"
-              style={{
-                display: 'inline-block',
-                padding: '7px 18px',
-                margin: '0 4px',
-                fontSize: 11,
-                color: alpha('#ffffff', 0.6),
-                textDecoration: 'none',
-                border: `1px solid ${alpha('#ffffff', 0.15)}`,
-                borderRadius: 24,
-                fontFamily: `'${bodyFont}', Arial, sans-serif`,
-                fontWeight: 600,
-                letterSpacing: '0.5px',
-              }}
-            >
-              {label}
-            </a>
-          ))}
-        </Column>
-      </Row>
-
-      <Hr
+  return (
+    <Section style={{ padding: 0 }}>
+      {/* Gradient top edge */}
+      <Section
         style={{
-          borderColor: alpha('#ffffff', 0.08),
-          borderTopWidth: 1,
-          margin: '0 0 20px',
+          height: 3,
+          background: `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary}, ${style.colorPrimary})`,
         }}
       />
-
-      <Text
+      <Section
         style={{
-          margin: 0,
-          fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) : 11,
-          color: block.style?.color || alpha('#ffffff', 0.3),
-          lineHeight: '1.8',
-          fontFamily: `'${bodyFont}', Arial, sans-serif`,
-          textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center',
-          textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+          backgroundColor: '#111117',
+          padding: bPad(block, 36, 48, 32, 48),
+          textAlign: 'center',
         }}
       >
-        <Lines text={block.content || 'Material exclusivo para profesionales de la salud.'} />
-      </Text>
+        {/* Logo */}
+        {style.logoUrl && (
+          <Img
+            src={style.logoUrl}
+            alt=""
+            height={30}
+            style={{
+              height: 30,
+              width: 'auto',
+              display: 'block',
+              margin: '0 auto 20px',
+              opacity: 0.6,
+            }}
+          />
+        )}
 
-      <Text
-        style={{
-          margin: '14px 0 0',
-          fontSize: 10,
-          color: alpha('#ffffff', 0.15),
-          fontFamily: `'${bodyFont}', Arial, sans-serif`,
-          letterSpacing: '2px',
-          textTransform: 'uppercase' as const,
-        }}
-      >
-        © {new Date().getFullYear()} TODOS LOS DERECHOS RESERVADOS
-      </Text>
+        {/* Social pills */}
+        {fLinks.length > 0 && (
+          <Row style={{ marginBottom: 20 }}>
+            <Column align="center">
+              {fLinks.map(({ platform, url }, idx) => (
+                <a
+                  key={`${platform}-${idx}`}
+                  href={url || '#'}
+                  style={{
+                    display: 'inline-block',
+                    padding: '7px 18px',
+                    margin: '0 4px 4px',
+                    fontSize: 11,
+                    color: fBtnColor,
+                    textDecoration: 'none',
+                    border: `1px solid ${block.style?.socialBtnColor || alpha('#ffffff', 0.15)}`,
+                    borderRadius: 24,
+                    fontFamily: fontFam,
+                    fontWeight: 600,
+                    letterSpacing: '0.5px',
+                    verticalAlign: 'middle',
+                  }}
+                >
+                  <img
+                    src={makeSocialIconSrc(platform, fBtnColor)}
+                    alt={platform}
+                    width={14}
+                    height={14}
+                    style={{ display: 'inline-block', verticalAlign: 'middle', width: 14, height: 14, marginRight: 6 }}
+                  />
+                  <span style={{ verticalAlign: 'middle' }}>{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
+                </a>
+              ))}
+            </Column>
+          </Row>
+        )}
+
+        <Hr
+          style={{
+            borderColor: alpha('#ffffff', 0.08),
+            borderTopWidth: 1,
+            margin: '0 0 20px',
+          }}
+        />
+
+        {/* QR Code */}
+        {qrUrl && (
+          <Section style={{ marginBottom: 20, textAlign: 'center' }}>
+            <a href={qrUrl} style={{ textDecoration: 'none' }}>
+              <Img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}&bgcolor=111117&color=ffffff`}
+                alt="QR Code"
+                width={100}
+                height={100}
+                style={{ display: 'block', margin: '0 auto 8px', width: 100, height: 100 }}
+              />
+            </a>
+            <Text style={{ fontFamily: fontFam, fontSize: 10, color: alpha('#ffffff', 0.25), margin: '0 0 4px', letterSpacing: '0.5px' }}>
+              {qrLabel}
+            </Text>
+          </Section>
+        )}
+
+        <Text
+          style={{
+            margin: 0,
+            fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) : 11,
+            color: block.style?.color || alpha('#ffffff', 0.3),
+            lineHeight: '1.8',
+            fontFamily: fontFam,
+            fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400,
+            textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center',
+            textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+          }}
+        >
+          <Lines text={block.content || 'Material exclusivo para profesionales de la salud.'} />
+        </Text>
+
+        {/* Company info (regulatory) */}
+        {companyInfo && (
+          <Text
+            style={{
+              margin: '16px 0 0',
+              fontSize: 9,
+              color: alpha('#ffffff', 0.18),
+              lineHeight: '1.7',
+              fontFamily: fontFam,
+              borderTop: `1px solid ${alpha('#ffffff', 0.05)}`,
+              paddingTop: 16,
+            }}
+          >
+            <Lines text={companyInfo} />
+          </Text>
+        )}
+
+        <Text
+          style={{
+            margin: '14px 0 0',
+            fontSize: 10,
+            color: alpha('#ffffff', 0.15),
+            fontFamily: fontFam,
+            letterSpacing: '2px',
+            textTransform: 'uppercase' as const,
+          }}
+        >
+          © {new Date().getFullYear()} TODOS LOS DERECHOS RESERVADOS
+        </Text>
+      </Section>
     </Section>
-  </Section>
-);
+  );
+};
 
 // ═══════════════════════════════════════════════════════════
 // QUOTE — Full tinted band with giant quotation mark
@@ -944,12 +1065,23 @@ const QuoteBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
 };
 
 // ═══════════════════════════════════════════════════════════
-// SOCIAL — Bold bordered pills on light background
+// SOCIAL — Customizable button pills with real SVG icons
 // ═══════════════════════════════════════════════════════════
 
-const SOCIAL_ICONS: Record<string, string> = {
-  linkedin: '💼', instagram: '📸', facebook: '👤', twitter: '𝕏',
-  youtube: '▶️', tiktok: '🎵', web: '🌐', email: '✉️',
+const SOCIAL_SVGS: Record<string, string> = {
+  linkedin: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="COLOR"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>`,
+  instagram: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="COLOR"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>`,
+  facebook: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="COLOR"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>`,
+  twitter: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="COLOR"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+  youtube: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="COLOR"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+  tiktok: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="COLOR"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
+  web: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>`,
+  email: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg>`,
+};
+
+const makeSocialIconSrc = (platform: string, color: string) => {
+  const svg = (SOCIAL_SVGS[platform.toLowerCase()] || SOCIAL_SVGS.web).replace(/COLOR/g, color);
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
 const SocialBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
@@ -958,17 +1090,37 @@ const SocialBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
     { platform: 'instagram', url: '#' },
     { platform: 'web', url: '#' },
   ];
+  const btnColor = block.style?.socialBtnColor || style.colorPrimary;
+  const btnStyleType = block.style?.socialBtnStyle || 'outline';
+  const btnShape = block.style?.socialBtnShape || 'pill';
+  const btnSize = block.style?.socialBtnSize || 'md';
+  const sizeMap: Record<string, { pad: string; fs: number; icon: number }> = {
+    sm: { pad: '6px 14px', fs: 11, icon: 14 },
+    md: { pad: '10px 22px', fs: 12, icon: 16 },
+    lg: { pad: '14px 28px', fs: 14, icon: 18 },
+  };
+  const sz = sizeMap[btnSize] || sizeMap.md;
+  const shapeMap: Record<string, number> = { pill: 30, rounded: 6, square: 0 };
+  const br = shapeMap[btnShape] ?? 30;
+  const isFilled = btnStyleType === 'filled';
+  const isIconOnly = btnStyleType === 'icon-only';
+  const iconColor = isFilled ? '#ffffff' : btnColor;
+  const customFont = block.style?.fontFamily;
+  const fontFam = customFont ? `'${customFont}', Arial, sans-serif` : `'${bodyFont}', Arial, sans-serif`;
+
   return (
     <Section style={{ padding: bPad(block, 28, 48, 28, 48), textAlign: 'center' }}>
       {block.content && (
         <Text
           style={{
-            fontFamily: `'${bodyFont}', Arial, sans-serif`,
-            fontSize: 12,
-            color: '#999999',
+            fontFamily: fontFam,
+            fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) : 12,
+            color: block.style?.color || '#999999',
             margin: '0 0 16px',
             letterSpacing: '1.5px',
-            textTransform: 'uppercase' as const,
+            textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || 'uppercase',
+            fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400,
+            textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center',
           }}
         >
           {block.content}
@@ -976,26 +1128,38 @@ const SocialBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
       )}
       <Row>
         <Column align="center">
-          {links.map(({ platform, url }) => (
+          {links.map(({ platform, url }, idx) => (
             <a
-              key={platform}
+              key={`${platform}-${idx}`}
               href={url || '#'}
               style={{
                 display: 'inline-block',
-                padding: '10px 22px',
+                padding: isIconOnly ? `${sz.icon * 0.5}px` : sz.pad,
                 margin: '0 4px 6px',
-                fontSize: 12,
-                color: style.colorPrimary,
+                fontSize: sz.fs,
+                color: isFilled ? '#ffffff' : btnColor,
                 textDecoration: 'none',
-                border: `2px solid ${style.colorPrimary}`,
-                borderRadius: 30,
-                fontFamily: `'${bodyFont}', Arial, sans-serif`,
+                backgroundColor: isFilled ? btnColor : 'transparent',
+                border: isIconOnly ? 'none' : `2px solid ${btnColor}`,
+                borderRadius: br,
+                fontFamily: fontFam,
                 fontWeight: 700,
                 letterSpacing: '0.3px',
+                verticalAlign: 'middle',
               }}
             >
-              {SOCIAL_ICONS[platform.toLowerCase()] || '🔗'}{' '}
-              {platform.charAt(0).toUpperCase() + platform.slice(1)}
+              <img
+                src={makeSocialIconSrc(platform, iconColor)}
+                alt={platform}
+                width={sz.icon}
+                height={sz.icon}
+                style={{ display: 'inline-block', verticalAlign: 'middle', width: sz.icon, height: sz.icon }}
+              />
+              {!isIconOnly && (
+                <span style={{ verticalAlign: 'middle', marginLeft: 6 }}>
+                  {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                </span>
+              )}
             </a>
           ))}
         </Column>
@@ -1134,8 +1298,10 @@ const ColumnsBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
   const cols = (block.content || '').split('|||').map((c) => c.trim());
   const left = cols[0] || '';
   const right = cols[1] || '';
+  const customFont = block.style?.fontFamily;
+  const colFontFam = customFont ? `'${customFont}', Arial, sans-serif` : `'${bodyFont}', Arial, sans-serif`;
   const colTextStyle: React.CSSProperties = {
-    fontFamily: `'${bodyFont}', Arial, sans-serif`,
+    fontFamily: colFontFam,
     fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) : 14,
     lineHeight: '1.8',
     color: block.style?.color || '#4a4a4a',

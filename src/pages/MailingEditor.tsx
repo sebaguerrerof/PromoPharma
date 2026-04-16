@@ -273,12 +273,27 @@ const MailingEditor: React.FC = () => {
     });
   };
 
+  // Strip undefined values recursively so Firestore doesn't reject the write
+  const sanitize = (obj: unknown): unknown => {
+    if (obj === null || obj === undefined) return null;
+    if (Array.isArray(obj)) return obj.map(sanitize);
+    if (typeof obj === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+        if (v !== undefined) out[k] = sanitize(v);
+      }
+      return out;
+    }
+    return obj;
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
     try {
+      const cleanBlocks = sanitize(blocks) as MailingBlockContent[];
       if (isEditing && project) {
-        await updateMailingBlocks(project.id, blocks);
+        await updateMailingBlocks(project.id, cleanBlocks);
         await updateMailingProject(project.id, { name: projectName, subject });
         toast('Email guardado', 'success');
       } else if (selectedBrand && selectedDesign) {
@@ -295,7 +310,8 @@ const MailingEditor: React.FC = () => {
         toast('Email creado', 'success');
         navigate(`/mailing/${newId}`, { replace: true });
       }
-    } catch {
+    } catch (err) {
+      console.error('[Save] Error al guardar mailing:', err);
       toast('Error al guardar', 'error');
     } finally {
       setSaving(false);
@@ -1521,28 +1537,64 @@ const EmailVisualPreview: React.FC<{
           </div>,
         block, true);
       }
-      case 'hero':
+      case 'hero': {
+        const hFont = block.style?.fontFamily || titleFont;
+        const hSize = block.style?.fontSize ? Math.max(parseInt(block.style.fontSize) * 0.55, 9) : 20;
+        const hColor = block.style?.color || '#ffffff';
+        const hAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center';
+        const hShadow = block.style?.imgShadow || 'none';
+        const hShadowColor = block.style?.imgShadowColor || 'rgba(0,0,0,0.12)';
+        const heroShadowMap: Record<string, string> = { none: 'none', sm: `0 1px 4px ${hShadowColor}`, md: `0 4px 16px ${hShadowColor}, 0 1px 4px rgba(0,0,0,0.05)`, lg: `0 12px 40px ${hShadowColor}` };
+        const hBorder = (!block.style?.imgBorder || block.style.imgBorder === 'none') ? undefined : block.style.imgBorder.includes('solid') && !block.style.imgBorder.includes('#') ? block.style.imgBorder.replace('solid', `solid ${block.style?.imgBorderColor || '#d1d5db'}`) : block.style.imgBorder;
+        const heroTitle = block.style?.heroTitle || '';
+        const heroSubtitle = block.style?.heroSubtitle || '';
+        const hasOverlay = !!(heroTitle || heroSubtitle);
         return wrapPreview(block.id,
           block.imageUrl ? (
-            <img src={block.imageUrl} alt="" style={{
-              width: block.style?.imgWidth === 'auto' ? 'auto' : `${block.style?.imgWidth || '100'}%`,
-              display: 'block',
-              height: block.style?.imgHeight ? `${block.style.imgHeight}px` : 'auto',
-              objectFit: (block.style?.imgObjectFit as React.CSSProperties['objectFit']) || undefined,
-              borderRadius: `${block.style?.imgBorderRadius || '0'}px`,
-              margin: block.style?.imgAlign === 'left' ? '0 auto 0 0' : block.style?.imgAlign === 'right' ? '0 0 0 auto' : '0 auto',
-            }} />
+            <div style={{ position: 'relative', overflow: 'hidden' }}>
+              <img src={block.imageUrl} alt={block.content || ''} style={{
+                width: block.style?.imgWidth === 'auto' ? 'auto' : `${block.style?.imgWidth || '100'}%`,
+                display: 'block',
+                height: block.style?.imgHeight ? `${block.style.imgHeight}px` : 'auto',
+                objectFit: (block.style?.imgObjectFit as React.CSSProperties['objectFit']) || undefined,
+                borderRadius: `${block.style?.imgBorderRadius || '0'}px`,
+                margin: block.style?.imgAlign === 'left' ? '0 auto 0 0' : block.style?.imgAlign === 'right' ? '0 0 0 auto' : '0 auto',
+                boxShadow: heroShadowMap[hShadow] || 'none',
+                border: hBorder,
+              }} />
+              {hasOverlay && (
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)',
+                  display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                  padding: '20px 24px', textAlign: hAlign,
+                  borderRadius: `${block.style?.imgBorderRadius || '0'}px`,
+                }}>
+                  {heroTitle && (
+                    <div style={{
+                      fontFamily: `'${hFont}', sans-serif`, fontWeight: 900, fontSize: hSize,
+                      color: hColor, letterSpacing: '-0.5px', lineHeight: 1.15,
+                      textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+                    }}>{heroTitle}</div>
+                  )}
+                  {heroSubtitle && (
+                    <div style={{ fontFamily: `'${hFont}', sans-serif`, fontSize: Math.max(hSize * 0.55, 7), color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{heroSubtitle}</div>
+                  )}
+                </div>
+              )}
+            </div>
           ) : (
             <div style={{ background: `linear-gradient(165deg, ${darkenHex(style.colorPrimary, 0.7)}, ${darkenHex(style.colorPrimary, 0.45)}, ${darkenHex(style.colorSecondary, 0.5)})`, padding: '40px 24px 36px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
               <div style={{ fontSize: 72, lineHeight: '1', color: 'rgba(255,255,255,0.03)', fontWeight: 900, fontFamily: `'${titleFont}', sans-serif`, marginBottom: -30 }}>+</div>
               <div style={{ display: 'inline-block', padding: '3px 12px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 20, fontSize: 7, color: 'rgba(255,255,255,0.5)', letterSpacing: '1.5px', textTransform: 'uppercase' as const, marginBottom: 10 }}>DESTACADO</div>
               <div style={{ fontFamily: `'${titleFont}', sans-serif`, fontWeight: 900, fontSize: 20, color: '#ffffff', letterSpacing: '-0.5px', lineHeight: 1.15, marginBottom: 4 }}>
-                {block.content || 'Imagen destacada'}
+                {heroTitle || 'Imagen destacada'}
               </div>
               <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.3)' }}>Agrega una imagen hero</div>
             </div>
           ),
         block);
+      }
       case 'text': {
         const hl = block.style?.headingLevel || '';
         const isTitle = hl === 'h1' || hl === 'h2' || hl === 'h3' || hl === 'h4' || block.style?.fontWeight === 'bold';
@@ -1580,12 +1632,29 @@ const EmailVisualPreview: React.FC<{
         const ialign = block.style?.imgAlign || 'center';
         const imargin = ialign === 'left' ? '0 auto 0 0' : ialign === 'right' ? '0 0 0 auto' : '0 auto';
         const ishadow = block.style?.imgShadow || 'md';
-        const shadowMap: Record<string, string> = { none: 'none', sm: '0 1px 4px rgba(0,0,0,0.08)', md: `0 4px 16px ${style.colorPrimary}25, 0 1px 4px rgba(0,0,0,0.05)`, lg: '0 12px 40px rgba(0,0,0,0.18)' };
+        const imgShadowColor = block.style?.imgShadowColor || 'rgba(0,0,0,0.12)';
+        const shadowMap: Record<string, string> = { none: 'none', sm: `0 1px 4px ${imgShadowColor}`, md: `0 4px 16px ${imgShadowColor}, 0 1px 4px rgba(0,0,0,0.05)`, lg: `0 12px 40px ${imgShadowColor}` };
         const iborder = (!block.style?.imgBorder || block.style.imgBorder === 'none') ? undefined : block.style.imgBorder.includes('solid') && !block.style.imgBorder.includes('#') ? block.style.imgBorder.replace('solid', `solid ${block.style?.imgBorderColor || '#d1d5db'}`) : block.style.imgBorder;
+        const imgFont = block.style?.fontFamily || bodyFont;
+        const imgFontSize = block.style?.fontSize ? Math.max(parseInt(block.style.fontSize) * 0.55, 8) : 9;
         return wrapPreview(block.id,
           <div style={{ padding: '12px 24px' }}>
             {block.imageUrl ? (
-              <img src={block.imageUrl} alt="" style={{ width: iw === 'auto' ? 'auto' : `${iw}%`, maxWidth: '100%', height: ih ? `${ih}px` : 'auto', objectFit: ifit, borderRadius: `${ibr}px`, display: 'block', margin: imargin, boxShadow: shadowMap[ishadow] || shadowMap.md, border: iborder }} />
+              <>
+                <img src={block.imageUrl} alt={block.content || ''} style={{ width: iw === 'auto' ? 'auto' : `${iw}%`, maxWidth: '100%', height: ih ? `${ih}px` : 'auto', objectFit: ifit, borderRadius: `${ibr}px`, display: 'block', margin: imargin, boxShadow: shadowMap[ishadow] || shadowMap.md, border: iborder }} />
+                {block.content && (
+                  <div style={{
+                    textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center',
+                    fontFamily: `'${imgFont}', sans-serif`,
+                    fontSize: imgFontSize,
+                    color: block.style?.color || '#888',
+                    marginTop: 6,
+                    fontStyle: 'italic',
+                    fontWeight: block.style?.fontWeight === 'bold' ? 600 : 400,
+                    textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+                  }}>{block.content}</div>
+                )}
+              </>
             ) : (
               <div style={{ background: 'linear-gradient(160deg, #f8f8fa, #eeeff2)', borderRadius: 3, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ color: '#b0b4bc', fontSize: 9, letterSpacing: '0.5px' }}>AGREGAR IMAGEN</span>
@@ -1677,29 +1746,66 @@ const EmailVisualPreview: React.FC<{
           </div>,
         block);
       }
-      case 'footer':
+      case 'footer': {
+        const fFont = block.style?.fontFamily || bodyFont;
+        const fSize = block.style?.fontSize ? Math.max(parseInt(block.style.fontSize) * 0.55, 7) : 8;
+        const fColor = block.style?.color || 'rgba(255,255,255,0.25)';
+        const fLinks = block.socialLinks ?? [{ platform: 'linkedin', url: '#' }, { platform: 'instagram', url: '#' }, { platform: 'web', url: '#' }];
+        const fBtnColor = block.style?.socialBtnColor || 'rgba(255,255,255,0.5)';
+        const fBtnBorder = block.style?.socialBtnColor || 'rgba(255,255,255,0.12)';
+        const socialSvgsFooter: Record<string, string> = {
+          linkedin: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>`,
+          instagram: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>`,
+          facebook: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>`,
+          twitter: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+          youtube: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+          tiktok: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
+          web: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>`,
+          email: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg>`,
+        };
+        const qrUrl = block.style?.footerQrUrl;
+        const companyInfo = block.style?.footerCompanyInfo;
         return wrapPreview(block.id,
           <div>
             <div style={{ height: 2, background: `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary}, ${style.colorPrimary})` }} />
             <div style={{ backgroundColor: '#111117', padding: '18px 20px 16px', textAlign: 'center' }}>
               {style.logoUrl && (<img src={style.logoUrl} alt="" style={{ height: 16, margin: '0 auto 10px', display: 'block', opacity: 0.5 }} />)}
-              <div style={{ marginBottom: 10 }}>
-                {['LinkedIn', 'Instagram', 'Web'].map((l) => (
-                  <span key={l} style={{ display: 'inline-block', padding: '3px 10px', margin: '0 2px', fontSize: 7, color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, fontWeight: 600, letterSpacing: '0.3px' }}>{l}</span>
-                ))}
-              </div>
+              {fLinks.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  {fLinks.map(({ platform }, idx) => (
+                    <span key={`${platform}-${idx}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '3px 10px', margin: '0 2px 2px', fontSize: 7, color: fBtnColor, border: `1px solid ${fBtnBorder}`, borderRadius: 12, fontWeight: 600, letterSpacing: '0.3px' }}>
+                      <span style={{ width: 10, height: 10, display: 'inline-block' }} dangerouslySetInnerHTML={{ __html: (socialSvgsFooter[platform.toLowerCase()] || socialSvgsFooter.web).replace('currentColor', fBtnColor) }} />
+                      {platform.charAt(0).toUpperCase() + platform.slice(1)}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 10 }} />
-              <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.25)', lineHeight: 1.7 }}>
+              {qrUrl && (
+                <div style={{ marginBottom: 10 }}>
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrUrl)}&bgcolor=111117&color=ffffff`} alt="QR" style={{ width: 50, height: 50, display: 'block', margin: '0 auto 4px', opacity: 0.6 }} />
+                  <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.5px' }}>Escanea para más info</div>
+                </div>
+              )}
+              <div style={{ fontFamily: `'${fFont}', sans-serif`, fontSize: fSize, color: fColor, lineHeight: 1.7, fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center', textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>
                 {(block.content || 'Material exclusivo para profesionales de la salud.').split('\n').map((l, i) => (
                   <span key={i}>{l}{i < (block.content || '').split('\n').length - 1 && <br />}</span>
                 ))}
               </div>
+              {companyInfo && (
+                <div style={{ fontFamily: `'${fFont}', sans-serif`, fontSize: Math.max(fSize - 1, 6), color: 'rgba(255,255,255,0.15)', lineHeight: 1.6, marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 8 }}>
+                  {companyInfo.split('\n').map((l, i) => (
+                    <span key={i}>{l}{i < companyInfo.split('\n').length - 1 && <br />}</span>
+                  ))}
+                </div>
+              )}
               <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.12)', marginTop: 6, letterSpacing: '1.5px', textTransform: 'uppercase' as const }}>
                 © {new Date().getFullYear()} TODOS LOS DERECHOS RESERVADOS
               </div>
             </div>
           </div>,
         block);
+      }
       case 'quote': {
         const qIcon = block.style?.quoteIcon || '❝';
         const qBg = block.style?.quoteBg || lightenHex(style.colorPrimary, 0.95);
@@ -1734,14 +1840,44 @@ const EmailVisualPreview: React.FC<{
       }
       case 'social': {
         const links = block.socialLinks ?? [{ platform: 'linkedin', url: '#' }, { platform: 'instagram', url: '#' }, { platform: 'web', url: '#' }];
-        const socialIcons: Record<string, string> = { linkedin: '💼', instagram: '📸', facebook: '👤', twitter: '𝕏', youtube: '▶️', tiktok: '🎵', web: '🌐', email: '✉️' };
+        const socialSvgs: Record<string, string> = {
+          linkedin: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>`,
+          instagram: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>`,
+          facebook: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>`,
+          twitter: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+          youtube: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+          tiktok: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>`,
+          web: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>`,
+          email: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg>`,
+        };
+        const btnColor = block.style?.socialBtnColor || style.colorPrimary;
+        const btnStyle = block.style?.socialBtnStyle || 'outline';
+        const btnShape = block.style?.socialBtnShape || 'pill';
+        const btnSize = block.style?.socialBtnSize || 'md';
+        const sizeMap: Record<string, { p: string; fs: number; icon: number }> = { sm: { p: '3px 8px', fs: 7, icon: 10 }, md: { p: '5px 12px', fs: 8, icon: 12 }, lg: { p: '7px 16px', fs: 9, icon: 14 } };
+        const sz = sizeMap[btnSize] || sizeMap.md;
+        const shapeMap: Record<string, number> = { pill: 50, rounded: 6, square: 0 };
+        const br = shapeMap[btnShape] ?? 50;
+        const isFilled = btnStyle === 'filled';
+        const isIconOnly = btnStyle === 'icon-only';
+        const socialTextFont = block.style?.fontFamily || bodyFont;
+        const socialTextSize = block.style?.fontSize ? Math.max(parseInt(block.style.fontSize) * 0.55, 7) : 8;
+        const socialTextColor = block.style?.color || '#999';
         return wrapPreview(block.id,
           <div style={{ padding: '14px 24px', textAlign: 'center' }}>
-            {block.content && (<div style={{ fontSize: 8, color: '#999', marginBottom: 8, letterSpacing: '1px', textTransform: 'uppercase' as const }}>{block.content}</div>)}
+            {block.content && (<div style={{ fontFamily: `'${socialTextFont}', sans-serif`, fontSize: socialTextSize, color: socialTextColor, marginBottom: 8, letterSpacing: '1px', textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || 'uppercase', fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400 }}>{block.content}</div>)}
             <div>
-              {links.map(({ platform }) => (
-                <span key={platform} style={{ display: 'inline-block', padding: '5px 12px', margin: '0 2px 3px', fontSize: 8, color: style.colorPrimary, border: `2px solid ${style.colorPrimary}`, borderRadius: 16, fontWeight: 700, letterSpacing: '0.2px' }}>
-                  {socialIcons[platform.toLowerCase()] || '🔗'} {platform}
+              {links.map(({ platform }, idx) => (
+                <span key={`${platform}-${idx}`} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: isIconOnly ? 0 : 4,
+                  padding: isIconOnly ? `${sz.icon * 0.6}px` : sz.p, margin: '0 2px 3px',
+                  fontSize: sz.fs, color: isFilled ? '#fff' : btnColor,
+                  backgroundColor: isFilled ? btnColor : 'transparent',
+                  border: isIconOnly ? 'none' : `1.5px solid ${btnColor}`,
+                  borderRadius: br, fontWeight: 700, letterSpacing: '0.2px',
+                }}>
+                  <span style={{ width: sz.icon, height: sz.icon, display: 'inline-block', flexShrink: 0 }} dangerouslySetInnerHTML={{ __html: (socialSvgs[platform.toLowerCase()] || socialSvgs.web).replace('currentColor', isFilled ? '#fff' : btnColor) }} />
+                  {!isIconOnly && <span>{platform.charAt(0).toUpperCase() + platform.slice(1)}</span>}
                 </span>
               ))}
             </div>
@@ -1804,13 +1940,14 @@ const EmailVisualPreview: React.FC<{
       }
       case 'columns': {
         const cols = (block.content || '').split('|||').map((c) => c.trim());
+        const colFont = block.style?.fontFamily || bodyFont;
         return wrapPreview(block.id,
           <div style={{ padding: '10px 24px', display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) * 0.65 : 10, color: block.style?.color || '#4a4a4a', lineHeight: 1.7, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined, fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400, textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>
+            <div style={{ flex: 1, fontFamily: `'${colFont}', sans-serif`, fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) * 0.65 : 10, color: block.style?.color || '#4a4a4a', lineHeight: 1.7, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined, fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400, textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>
               {(cols[0] || 'Columna izquierda').split('\n').map((l, i) => (<span key={i}>{l}{i < (cols[0] || '').split('\n').length - 1 && <br />}</span>))}
             </div>
             <div style={{ width: 2, backgroundColor: lightenHex(style.colorPrimary, 0.7), flexShrink: 0 }} />
-            <div style={{ flex: 1, fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) * 0.65 : 10, color: block.style?.color || '#4a4a4a', lineHeight: 1.7, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined, fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400, textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>
+            <div style={{ flex: 1, fontFamily: `'${colFont}', sans-serif`, fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) * 0.65 : 10, color: block.style?.color || '#4a4a4a', lineHeight: 1.7, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined, fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400, textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>
               {(cols[1] || 'Columna derecha').split('\n').map((l, i) => (<span key={i}>{l}{i < (cols[1] || '').split('\n').length - 1 && <br />}</span>))}
             </div>
           </div>,
@@ -2016,6 +2153,132 @@ const BlockEditor: React.FC<{
           </div>
         )}
 
+        {/* ── Footer specific controls ── */}
+        {block.type === 'footer' && (
+          <>
+            {/* Social links for footer */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-2">Redes sociales del footer</label>
+              {(block.socialLinks ?? [{ platform: 'linkedin', url: '' }, { platform: 'instagram', url: '' }, { platform: 'web', url: '' }]).map(
+                (link, idx) => (
+                  <div key={idx} className="flex items-center gap-2 mb-2">
+                    <select
+                      value={link.platform}
+                      onChange={(e) => {
+                        const links = [...(block.socialLinks ?? [{ platform: 'linkedin', url: '' }, { platform: 'instagram', url: '' }, { platform: 'web', url: '' }])];
+                        links[idx] = { ...links[idx], platform: e.target.value };
+                        onChange({ socialLinks: links });
+                      }}
+                      className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
+                    >
+                      {['linkedin', 'instagram', 'facebook', 'twitter', 'youtube', 'tiktok', 'web', 'email'].map((p) => (
+                        <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                      ))}
+                    </select>
+                    <input
+                      value={link.url}
+                      onChange={(e) => {
+                        const links = [...(block.socialLinks ?? [{ platform: 'linkedin', url: '' }, { platform: 'instagram', url: '' }, { platform: 'web', url: '' }])];
+                        links[idx] = { ...links[idx], url: e.target.value };
+                        onChange({ socialLinks: links });
+                      }}
+                      className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
+                      placeholder="https://..."
+                    />
+                    <button
+                      onClick={() => {
+                        const links = [...(block.socialLinks ?? [{ platform: 'linkedin', url: '' }, { platform: 'instagram', url: '' }, { platform: 'web', url: '' }])];
+                        links.splice(idx, 1);
+                        onChange({ socialLinks: links });
+                      }}
+                      className="p-1 text-red-400 hover:text-red-600 transition text-xs"
+                    >✕</button>
+                  </div>
+                ),
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const links = [...(block.socialLinks ?? [{ platform: 'linkedin', url: '' }, { platform: 'instagram', url: '' }, { platform: 'web', url: '' }])];
+                    links.push({ platform: 'web', url: '' });
+                    onChange({ socialLinks: links });
+                  }}
+                  className="text-[11px] text-blue-600 hover:text-blue-800 font-medium transition"
+                >
+                  + Agregar red social
+                </button>
+                {block.socialLinks && block.socialLinks.length > 0 && (
+                  <button
+                    onClick={() => onChange({ socialLinks: [] })}
+                    className="text-[11px] text-gray-400 hover:text-red-500 font-medium transition"
+                  >
+                    Quitar todas
+                  </button>
+                )}
+              </div>
+              {/* Button color */}
+              <div className="flex items-center gap-2 mt-2">
+                <label className="text-[10px] text-gray-400">Color botones</label>
+                <input
+                  type="color"
+                  value={(() => {
+                    const c = block.style?.socialBtnColor;
+                    if (!c || c.startsWith('rgba')) return '#ffffff';
+                    return c;
+                  })()}
+                  onChange={(e) => onChange({ style: { ...block.style, socialBtnColor: e.target.value } })}
+                  className="w-6 h-6 rounded border border-gray-200 cursor-pointer"
+                />
+                {block.style?.socialBtnColor && (
+                  <button onClick={() => { const s = { ...block.style }; delete s.socialBtnColor; onChange({ style: s }); }} className="text-[10px] text-gray-400 hover:text-red-500">✕</button>
+                )}
+              </div>
+            </div>
+
+            {/* QR Code */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Código QR <span className="font-normal text-gray-400">(opcional)</span></label>
+              <input
+                value={block.style?.footerQrUrl || ''}
+                onChange={(e) => onChange({ style: { ...block.style, footerQrUrl: e.target.value } })}
+                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                placeholder="https://link-del-producto.com"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">Se generará un QR automáticamente con este URL</p>
+              {block.style?.footerQrUrl && (
+                <div className="mt-2 flex items-center gap-3">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(block.style.footerQrUrl)}&bgcolor=111117&color=ffffff`}
+                    alt="QR Preview"
+                    className="w-16 h-16 rounded-lg border border-gray-200"
+                  />
+                  <div>
+                    <input
+                      value={block.style?.footerQrLabel || ''}
+                      onChange={(e) => onChange({ style: { ...block.style, footerQrLabel: e.target.value } })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
+                      placeholder="Etiqueta QR (ej: Escanea para más info)"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Company info */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Información de la empresa <span className="font-normal text-gray-400">(regulatorio)</span></label>
+              <textarea
+                value={block.style?.footerCompanyInfo || ''}
+                onChange={(e) => onChange({ style: { ...block.style, footerCompanyInfo: e.target.value } })}
+                rows={3}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs leading-relaxed focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition resize-none"
+                placeholder="Razón social, dirección, teléfono, registro sanitario..."
+              />
+              <p className="text-[10px] text-gray-400 mt-1">Información obligatoria por regulación en comunicados</p>
+            </div>
+          </>
+        )}
+
         {/* ── Bullets style controls ── */}
         {block.type === 'bullets' && (
           <div className="space-y-3">
@@ -2083,6 +2346,29 @@ const BlockEditor: React.FC<{
         {/* ── Image upload + URL (hero, image) ── */}
         {(block.type === 'hero' || block.type === 'image') && (
           <>
+            {/* Hero overlay text fields */}
+            {block.type === 'hero' && (
+              <>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Título sobre imagen</label>
+                  <input
+                    value={block.style?.heroTitle || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, heroTitle: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm font-bold focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="Título destacado..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Subtítulo</label>
+                  <input
+                    value={block.style?.heroSubtitle || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, heroSubtitle: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="Subtítulo opcional..."
+                  />
+                </div>
+              </>
+            )}
             <div>
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Imagen</label>
               <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
@@ -2145,12 +2431,12 @@ const BlockEditor: React.FC<{
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Texto alternativo</label>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Leyenda / Texto alt</label>
               <input
                 value={block.content}
                 onChange={(e) => onChange({ content: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
-                placeholder="Descripción de la imagen"
+                placeholder="Leyenda debajo de la imagen"
               />
             </div>
 
@@ -2304,6 +2590,26 @@ const BlockEditor: React.FC<{
                         </button>
                       ))}
                     </div>
+                    {block.style?.imgShadow !== 'none' && (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <label className="text-[10px] text-gray-400">Color sombra</label>
+                        <input
+                          type="color"
+                          value={block.style?.imgShadowColor ? (block.style.imgShadowColor.startsWith('#') ? block.style.imgShadowColor : '#000000') : '#000000'}
+                          onChange={(e) => {
+                            const hex = e.target.value;
+                            const r = parseInt(hex.slice(1, 3), 16);
+                            const g = parseInt(hex.slice(3, 5), 16);
+                            const b = parseInt(hex.slice(5, 7), 16);
+                            onChange({ style: { ...block.style, imgShadowColor: `rgba(${r},${g},${b},0.15)` } });
+                          }}
+                          className="w-6 h-6 rounded border border-gray-200 cursor-pointer"
+                        />
+                        {block.style?.imgShadowColor && (
+                          <button onClick={() => { const s = { ...block.style }; delete s.imgShadowColor; onChange({ style: s }); }} className="text-[10px] text-gray-400 hover:text-red-500">✕</button>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {/* Preview */}
                   <div className="pt-1">
@@ -2319,7 +2625,7 @@ const BlockEditor: React.FC<{
                           objectFit: (block.style?.imgObjectFit as React.CSSProperties['objectFit']) || 'contain',
                           borderRadius: `${block.style?.imgBorderRadius || '4'}px`,
                           border: block.style?.imgBorder === 'none' ? 'none' : (block.style?.imgBorder?.includes('solid') ? block.style.imgBorder.replace('solid', `solid ${block.style?.imgBorderColor || '#d1d5db'}`) : undefined),
-                          boxShadow: block.style?.imgShadow === 'none' ? 'none' : block.style?.imgShadow === 'sm' ? '0 1px 4px rgba(0,0,0,0.08)' : block.style?.imgShadow === 'lg' ? '0 12px 40px rgba(0,0,0,0.18)' : '0 4px 16px rgba(0,0,0,0.1)',
+                          boxShadow: (() => { const sc = block.style?.imgShadowColor || 'rgba(0,0,0,0.12)'; const sh = block.style?.imgShadow || 'md'; if (sh === 'none') return 'none'; if (sh === 'sm') return `0 1px 4px ${sc}`; if (sh === 'lg') return `0 12px 40px ${sc}`; return `0 4px 16px ${sc}`; })(),
                         }}
                       />
                     </div>
@@ -2704,7 +3010,67 @@ const BlockEditor: React.FC<{
                 placeholder="Síguenos en redes sociales"
               />
             </div>
-            <div>
+
+            {/* ── Button style controls ── */}
+            <div className="pt-2 border-t border-gray-100 space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Estilo de botones</span>
+              </div>
+              {/* Style */}
+              <div>
+                <label className="block text-[10px] text-gray-400 mb-1">Estilo</label>
+                <div className="flex gap-1">
+                  {([['outline', 'Borde'], ['filled', 'Relleno'], ['icon-only', 'Solo icono']] as const).map(([val, label]) => (
+                    <button key={val}
+                      onClick={() => onChange({ style: { ...block.style, socialBtnStyle: val } })}
+                      className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${(block.style?.socialBtnStyle || 'outline') === val ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    >{label}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Shape */}
+              <div>
+                <label className="block text-[10px] text-gray-400 mb-1">Forma</label>
+                <div className="flex gap-1">
+                  {([['pill', 'Píldora'], ['rounded', 'Redondeado'], ['square', 'Cuadrado']] as const).map(([val, label]) => (
+                    <button key={val}
+                      onClick={() => onChange({ style: { ...block.style, socialBtnShape: val } })}
+                      className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${(block.style?.socialBtnShape || 'pill') === val ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    >{label}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Size */}
+              <div>
+                <label className="block text-[10px] text-gray-400 mb-1">Tamaño</label>
+                <div className="flex gap-1">
+                  {([['sm', 'Pequeño'], ['md', 'Mediano'], ['lg', 'Grande']] as const).map(([val, label]) => (
+                    <button key={val}
+                      onClick={() => onChange({ style: { ...block.style, socialBtnSize: val } })}
+                      className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${(block.style?.socialBtnSize || 'md') === val ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                    >{label}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Color */}
+              <div>
+                <label className="block text-[10px] text-gray-400 mb-1">Color de botones</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={block.style?.socialBtnColor || style.colorPrimary}
+                    onChange={(e) => onChange({ style: { ...block.style, socialBtnColor: e.target.value } })}
+                    className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer"
+                  />
+                  <span className="text-[10px] text-gray-400">{block.style?.socialBtnColor || style.colorPrimary}</span>
+                  {block.style?.socialBtnColor && (
+                    <button onClick={() => { const s = { ...block.style }; delete s.socialBtnColor; onChange({ style: s }); }} className="text-[10px] text-gray-400 hover:text-red-500">✕ Reset</button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-gray-100">
               <label className="block text-[11px] font-semibold text-gray-500 mb-2">Redes sociales</label>
               {(block.socialLinks ?? [{ platform: 'linkedin', url: '' }, { platform: 'instagram', url: '' }, { platform: 'web', url: '' }]).map(
                 (link, idx) => (
@@ -2959,7 +3325,7 @@ const BlockEditor: React.FC<{
         )}
 
         {/* ── Text styling controls ── */}
-        {['text', 'bullets', 'header', 'footer', 'quote', 'hero', 'cta', 'columns', 'video'].includes(block.type) && (
+        {['text', 'bullets', 'header', 'footer', 'quote', 'hero', 'cta', 'columns', 'video', 'image', 'social'].includes(block.type) && (
           <div className="pt-3 border-t border-gray-100">
             <div className="flex items-center gap-2 mb-2.5">
               <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Estilo del texto</span>
