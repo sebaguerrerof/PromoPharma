@@ -8,8 +8,18 @@ const navItems = [
   { to: '/moleculas', label: 'Moléculas', icon: MoleculeIcon },
   { to: '/marcas', label: 'Marcas', icon: BrandIcon },
   { to: '/campanas', label: 'Campañas', icon: CampaignIcon },
+  { to: '/mailing', label: 'Mailing', icon: MailingIcon },
   { to: '/conocimiento', label: 'Conocimiento', icon: KnowledgeIcon },
 ];
+
+function MailingIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="3" />
+      <path d="M22 7l-10 7L2 7" />
+    </svg>
+  );
+}
 
 function KnowledgeIcon({ className }: { className?: string }) {
   return (

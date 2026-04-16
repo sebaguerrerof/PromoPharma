@@ -206,7 +206,7 @@ REGLAS OBLIGATORIAS DE CONSISTENCIA VISUAL:
 - Mantén estructura, densidad y tono editorial del folleto base.
 
 PARÁMETROS VISUALES DEL LOGO:
-Puedes modificar "__logo_scale" y "__logo_position" SOLO cuando el usuario lo solicite explícitamente.
+Puedes modificar "__logo_scale", "__logo_x" y "__logo_y" SOLO cuando el usuario lo solicite explícitamente.
 
 FORMATO DE RESPUESTA:
 Cuando generes o modifiques contenido, incluye un bloque JSON al final:
@@ -230,7 +230,8 @@ PARÁMETROS VISUALES DEL LOGO:
 Además de los slots de texto, PUEDES modificar el tamaño y la posición del logo.
 Para hacerlo, incluye estos campos especiales en tu JSON:
 - "__logo_scale": un número entre 0.5 y 3.0 (tamaño del logo, 1.0 = tamaño normal por defecto)
-- "__logo_position": "left", "center" o "right" (posición del logo en el material)
+- "__logo_x": un número entre -50 y 50 (desplazamiento horizontal en píxeles, 0 = posición original)
+- "__logo_y": un número entre -50 y 50 (desplazamiento vertical en píxeles, 0 = posición original)
 Solo inclúyelos cuando el usuario lo pida explícitamente.
 
 FORMATO DE RESPUESTA:
@@ -283,7 +284,7 @@ function tryParseSlotValues(
   ];
 
   // Claves especiales de parámetros visuales
-  const VISUAL_KEYS = ['__logo_scale', '__logo_position'];
+  const VISUAL_KEYS = ['__logo_scale', '__logo_x', '__logo_y'];
 
   for (const pattern of patterns) {
     const match = text.match(pattern);
@@ -987,8 +988,10 @@ export async function createSession(data: {
   brochureLayoutSpec?: BrochureLayoutSpec;
 }): Promise<string> {
   const { initialSlotValues, ...rest } = data;
+  // Firestore rejects undefined values — strip them recursively
+  const clean = JSON.parse(JSON.stringify(rest));
   const ref = await addDoc(collection(db, SESSIONS), {
-    ...rest,
+    ...clean,
     slotValues: initialSlotValues ?? {},
     messages: [],
     status: 'draft',

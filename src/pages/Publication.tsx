@@ -352,6 +352,20 @@ const PublicationPage: React.FC = () => {
     };
   }, [brand, session]);
 
+  const brochureLayoutSpec = useMemo(() => {
+    if (!session) return null;
+    if (session.brochureLayoutSpec) return session.brochureLayoutSpec;
+    const raw = session.slotValues['__layout_spec'];
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as BrochureLayoutSpec;
+      if (!parsed?.pages || !Array.isArray(parsed.pages)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, [session]);
+
   const handlePrint = () => {
     if (!session) { window.print(); return; }
 
@@ -497,25 +511,12 @@ const PublicationPage: React.FC = () => {
 
   // Logo visual params from session slotValues
   const pubLogoScale = parseFloat(session.slotValues['__logo_scale'] || '1') || 1;
-  const pubLogoPosition = (session.slotValues['__logo_position'] || 'left') as 'left' | 'center' | 'right';
+  const pubLogoX = parseFloat(session.slotValues['__logo_x'] || '0') || 0;
+  const pubLogoY = parseFloat(session.slotValues['__logo_y'] || '0') || 0;
   const pubLogoSize = (baseRem: number) => `${baseRem * pubLogoScale}rem`;
-  const pubLogoPosClass = pubLogoPosition === 'center' ? 'mx-auto' : pubLogoPosition === 'right' ? 'ml-auto' : '';
-  const pubLogoPosFlexClass = pubLogoPosition === 'center' ? 'justify-center' : pubLogoPosition === 'right' ? 'justify-end' : 'justify-start';
+  const pubLogoTransform = { transform: `translate(${pubLogoX}px, ${pubLogoY}px)` };
   const renderBrand = effectiveBrand ?? brand;
   const isBrochureLocked = session.slotValues['__design_mode'] === 'brochure_locked';
-
-  const brochureLayoutSpec = useMemo(() => {
-    if (session.brochureLayoutSpec) return session.brochureLayoutSpec;
-    const raw = session.slotValues['__layout_spec'];
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw) as BrochureLayoutSpec;
-      if (!parsed?.pages || !Array.isArray(parsed.pages)) return null;
-      return parsed;
-    } catch {
-      return null;
-    }
-  }, [session]);
 
   return (
     <div>
@@ -714,8 +715,8 @@ const PublicationPage: React.FC = () => {
                         <img
                           src={renderBrand.params.logoUrl}
                           alt={`${renderBrand.name} logo`}
-                          className={`rounded-lg object-contain bg-white/90 p-2 shadow-md mb-6 ${pubLogoPosClass}`}
-                          style={{ height: pubLogoSize(4), width: pubLogoSize(4) }}
+                          className="rounded-lg object-contain bg-white/90 p-2 shadow-md mb-6"
+                          style={{ height: pubLogoSize(4), width: pubLogoSize(4), ...pubLogoTransform }}
                         />
                       )}
                       {slideGroup.slots.filter((s) => s.type !== 'image').map((slot) => {
@@ -775,7 +776,7 @@ const PublicationPage: React.FC = () => {
                           src={renderBrand.params.logoUrl}
                           alt={renderBrand.name}
                           className="object-contain opacity-60"
-                          style={{ height: pubLogoSize(2), width: pubLogoSize(2) }}
+                          style={{ height: pubLogoSize(2), width: pubLogoSize(2), ...pubLogoTransform }}
                         />
                       )}
                     </div>
@@ -1147,7 +1148,7 @@ const PublicationPage: React.FC = () => {
 
                   {/* --- TOP: Logo + brand badge --- */}
                   <div className="px-8 pt-6">
-                    <div className={`flex items-center gap-3 ${pubLogoPosFlexClass}`}>
+                    <div className="flex items-center gap-3">
                       {renderBrand.params.logoUrl && (
                         <img
                           src={renderBrand.params.logoUrl}
@@ -1159,6 +1160,7 @@ const PublicationPage: React.FC = () => {
                             padding: '5px',
                             background: 'rgba(255,255,255,.95)',
                             boxShadow: '0 4px 24px rgba(0,0,0,.15)',
+                            ...pubLogoTransform,
                           }}
                         />
                       )}
@@ -1358,7 +1360,7 @@ const PublicationPage: React.FC = () => {
                       src={renderBrand.params.logoUrl}
                       alt={renderBrand.name}
                       className="object-contain opacity-50"
-                      style={{ height: pubLogoSize(2), width: pubLogoSize(2) }}
+                      style={{ height: pubLogoSize(2), width: pubLogoSize(2), ...pubLogoTransform }}
                     />
                   )}
                 </div>

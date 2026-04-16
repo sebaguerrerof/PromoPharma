@@ -1,0 +1,937 @@
+import * as React from 'react';
+import {
+  Html,
+  Head,
+  Body,
+  Container,
+  Section,
+  Row,
+  Column,
+  Text,
+  Button,
+  Img,
+  Hr,
+  Heading,
+  Font,
+  Preview,
+  Tailwind,
+  pixelBasedPreset,
+} from '@react-email/components';
+import type { MailingBlockContent, DesignLayout } from '@/types';
+
+// ── Props ────────────────────────────────────────────────
+
+export interface MailingEmailProps {
+  subject: string;
+  previewText?: string;
+  blocks: MailingBlockContent[];
+  layout: DesignLayout;
+  style: {
+    colorPrimary: string;
+    colorSecondary: string;
+    colorBackground: string;
+    fontTitle: string;
+    fontBody: string;
+    logoUrl?: string;
+  };
+  emailSettings?: {
+    bodyBackground?: string;
+    bodyBackgroundImage?: string;
+    containerWidth?: number;
+    borderRadius?: number;
+    preheaderText?: string;
+  };
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+/** Lighten a hex color toward white by a percentage (0-1) */
+function lighten(hex: string, amount: number): string {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  const lr = Math.round(r + (255 - r) * amount);
+  const lg = Math.round(g + (255 - g) * amount);
+  const lb = Math.round(b + (255 - b) * amount);
+  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`;
+}
+
+/** Multiline text helper */
+const Lines: React.FC<{ text: string }> = ({ text }) => {
+  const lines = (text || '').split('\n');
+  return (
+    <>
+      {lines.map((line, i) => (
+        <React.Fragment key={i}>
+          {line}
+          {i < lines.length - 1 && <br />}
+        </React.Fragment>
+      ))}
+    </>
+  );
+};
+
+// ── Main Component ───────────────────────────────────────
+
+export const MailingEmail: React.FC<MailingEmailProps> = ({
+  subject,
+  previewText,
+  blocks,
+  layout,
+  style,
+  emailSettings,
+}) => {
+  const bodyFont = style.fontBody || 'Inter';
+  const titleFont = style.fontTitle || 'Inter';
+  const bg = style.colorBackground || '#ffffff';
+  const tint = lighten(style.colorPrimary, 0.95);
+  const bodyBg = emailSettings?.bodyBackground || '#f4f4f8';
+  const containerW = emailSettings?.containerWidth || layout.width;
+  const borderR = emailSettings?.borderRadius ?? 12;
+  const preheader = emailSettings?.preheaderText || previewText;
+
+  return (
+    <Html lang="es">
+      <Head>
+        <title>{subject}</title>
+        <Font fontFamily={bodyFont} fallbackFontFamily="Arial" />
+        {titleFont !== bodyFont && (
+          <Font fontFamily={titleFont} fallbackFontFamily="Arial" />
+        )}
+        <style>{`
+          /* Reset */
+          body, table, td, p, a, li { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+          table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+          img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+          /* Dark mode support */
+          @media (prefers-color-scheme: dark) {
+            .email-body { background-color: #1a1a2e !important; }
+            .email-container { background-color: #16213e !important; }
+            .text-main { color: #e0e0e0 !important; }
+            .text-muted { color: #9ca3af !important; }
+          }
+        `}</style>
+      </Head>
+      {preheader && <Preview>{preheader}</Preview>}
+      <Tailwind
+        config={{
+          presets: [pixelBasedPreset],
+          theme: {
+            extend: {
+              colors: {
+                primary: style.colorPrimary,
+                secondary: style.colorSecondary,
+                tint: tint,
+              },
+            },
+          },
+        }}
+      >
+        <Body
+          className="email-body"
+          style={{
+            margin: 0,
+            padding: 0,
+            backgroundColor: bodyBg,
+            backgroundImage: emailSettings?.bodyBackgroundImage ? `url(${emailSettings.bodyBackgroundImage})` : undefined,
+            backgroundSize: emailSettings?.bodyBackgroundImage ? 'cover' : undefined,
+            backgroundPosition: emailSettings?.bodyBackgroundImage ? 'center top' : undefined,
+            WebkitTextSizeAdjust: 'none',
+            fontFamily: `'${bodyFont}', Arial, Helvetica, sans-serif`,
+          }}
+        >
+          {/* Top accent bar */}
+          <Section style={{ backgroundColor: 'transparent', padding: '28px 0 0' }}>
+            <Container style={{ maxWidth: containerW }}>
+              <Section
+                style={{
+                  height: 4,
+                  background: `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary}, ${style.colorPrimary})`,
+                  borderRadius: `${borderR}px ${borderR}px 0 0`,
+                }}
+              />
+            </Container>
+          </Section>
+
+          {/* Main email container */}
+          <Container
+            className="email-container"
+            style={{
+              maxWidth: containerW,
+              margin: '0 auto 28px',
+              backgroundColor: bg,
+              borderRadius: `0 0 ${borderR}px ${borderR}px`,
+              overflow: 'hidden',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04)',
+            }}
+          >
+            {blocks.map((block) => (
+              <BlockRenderer
+                key={block.id}
+                block={block}
+                style={style}
+                titleFont={titleFont}
+                bodyFont={bodyFont}
+                tint={tint}
+              />
+            ))}
+          </Container>
+
+          {/* Unsubscribe / bottom line */}
+          <Container style={{ maxWidth: containerW, margin: '0 auto 32px' }}>
+            <Text
+              style={{
+                textAlign: 'center',
+                fontSize: 11,
+                color: '#b0b0b0',
+                margin: 0,
+                fontFamily: `'${bodyFont}', Arial, sans-serif`,
+              }}
+            >
+              Si no deseas recibir más correos, puedes{' '}
+              <a href="#" style={{ color: '#b0b0b0', textDecoration: 'underline' }}>
+                cancelar tu suscripción
+              </a>
+              .
+            </Text>
+          </Container>
+        </Body>
+      </Tailwind>
+    </Html>
+  );
+};
+
+export default MailingEmail;
+
+// ── Block Renderer ───────────────────────────────────────
+
+const BlockRenderer: React.FC<{
+  block: MailingBlockContent;
+  style: MailingEmailProps['style'];
+  titleFont: string;
+  bodyFont: string;
+  tint: string;
+}> = ({ block, style, titleFont, bodyFont, tint }) => {
+  const common = { block, style, titleFont, bodyFont, tint };
+
+  // Wrap with per-block background if set
+  const wrapBg = (el: React.ReactElement) => {
+    if (block.backgroundColor || block.backgroundImage) {
+      return (
+        <Section
+          style={{
+            backgroundColor: block.backgroundColor || undefined,
+            backgroundImage: block.backgroundImage ? `url(${block.backgroundImage})` : undefined,
+            backgroundSize: block.backgroundImage ? 'cover' : undefined,
+            backgroundPosition: block.backgroundImage ? 'center' : undefined,
+            paddingTop: block.paddingTop ?? 0,
+            paddingBottom: block.paddingBottom ?? 0,
+          }}
+        >
+          {el}
+        </Section>
+      );
+    }
+    return el;
+  };
+
+  switch (block.type) {
+    case 'header':
+      return wrapBg(<HeaderBlock {...common} />);
+    case 'hero':
+      return wrapBg(<HeroBlock {...common} />);
+    case 'text':
+      return wrapBg(<TextBlock {...common} />);
+    case 'image':
+      return wrapBg(<ImageBlock {...common} />);
+    case 'bullets':
+      return wrapBg(<BulletsBlock {...common} />);
+    case 'cta':
+      return wrapBg(<CtaBlock {...common} />);
+    case 'divider':
+      return wrapBg(<DividerBlock {...common} />);
+    case 'spacer':
+      return <SpacerBlock />;
+    case 'footer':
+      return wrapBg(<FooterBlock {...common} />);
+    case 'quote':
+      return wrapBg(<QuoteBlock {...common} />);
+    case 'social':
+      return wrapBg(<SocialBlock {...common} />);
+    case 'video':
+      return wrapBg(<VideoBlock {...common} />);
+    case 'html':
+      return wrapBg(<HtmlBlock {...common} />);
+    case 'columns':
+      return wrapBg(<ColumnsBlock {...common} />);
+    default:
+      return (
+        <Section style={{ padding: '16px 40px' }}>
+          <Text className="text-main" style={{ fontSize: 15, fontFamily: `'${bodyFont}', Arial, sans-serif`, color: '#374151', margin: 0, lineHeight: '1.7' }}>
+            {block.content}
+          </Text>
+        </Section>
+      );
+  }
+};
+
+// ── Block Props ──────────────────────────────────────────
+
+interface BlockProps {
+  block: MailingBlockContent;
+  style: MailingEmailProps['style'];
+  titleFont: string;
+  bodyFont: string;
+  tint: string;
+}
+
+// ═══════════════════════════════════════════════════════════
+// HEADER — Full-width brand bar with subtle gradient + logo
+// ═══════════════════════════════════════════════════════════
+
+const HeaderBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => {
+  const logoSrc = block.imageUrl || style.logoUrl;
+  return (
+    <Section
+      style={{
+        background: `linear-gradient(135deg, ${style.colorPrimary} 0%, ${style.colorSecondary} 100%)`,
+        padding: '28px 32px',
+      }}
+    >
+      <Row>
+        <Column style={{ verticalAlign: 'middle' }}>
+          {logoSrc && (
+            <Img
+              src={logoSrc}
+              alt="Logo"
+              height={38}
+              style={{
+                height: 38,
+                width: 'auto',
+                display: 'inline-block',
+                verticalAlign: 'middle',
+                marginRight: 14,
+              }}
+            />
+          )}
+          <Heading
+            as="h1"
+            style={{
+              display: 'inline',
+              fontFamily: `'${titleFont}', Arial, sans-serif`,
+              fontSize: 20,
+              fontWeight: 700,
+              color: '#ffffff',
+              verticalAlign: 'middle',
+              margin: 0,
+              letterSpacing: '-0.3px',
+            }}
+          >
+            {block.content || ''}
+          </Heading>
+        </Column>
+        {/* Right side — date or tagline could go here */}
+        <Column align="right" style={{ verticalAlign: 'middle' }}>
+          <Text
+            style={{
+              margin: 0,
+              fontSize: 11,
+              color: 'rgba(255,255,255,0.65)',
+              fontFamily: `'${titleFont}', Arial, sans-serif`,
+            }}
+          >
+            {new Date().toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+          </Text>
+        </Column>
+      </Row>
+    </Section>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// HERO — Full-bleed image or gradient placeholder with overlay text
+// ═══════════════════════════════════════════════════════════
+
+const HeroBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => (
+  <Section style={{ padding: 0 }}>
+    {block.imageUrl ? (
+      <Img
+        src={block.imageUrl}
+        alt={block.content || ''}
+        width="100%"
+        style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
+      />
+    ) : (
+      <Section
+        style={{
+          background: `linear-gradient(160deg, ${lighten(style.colorPrimary, 0.88)} 0%, ${lighten(style.colorSecondary, 0.85)} 50%, ${lighten(style.colorPrimary, 0.92)} 100%)`,
+          padding: '60px 40px',
+          textAlign: 'center',
+        }}
+      >
+        {/* Abstract decorative circle */}
+        <Section
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: 40,
+            background: `linear-gradient(135deg, ${style.colorPrimary}30, ${style.colorSecondary}20)`,
+            margin: '0 auto 20px',
+          }}
+        />
+        <Heading
+          as="h2"
+          style={{
+            fontFamily: `'${titleFont}', Arial, sans-serif`,
+            fontSize: 26,
+            fontWeight: 800,
+            color: style.colorPrimary,
+            margin: '0 0 8px',
+            letterSpacing: '-0.5px',
+            lineHeight: '1.2',
+          }}
+        >
+          {block.content || 'Imagen destacada'}
+        </Heading>
+        <Text
+          style={{
+            fontSize: 13,
+            color: '#6b7280',
+            margin: 0,
+          }}
+        >
+          Sube una imagen para reemplazar este placeholder
+        </Text>
+      </Section>
+    )}
+  </Section>
+);
+
+// ═══════════════════════════════════════════════════════════
+// TEXT — Rich text block with title/body awareness
+// ═══════════════════════════════════════════════════════════
+
+const TextBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) => {
+  const isTitle = block.style?.fontWeight === 'bold';
+  const baseFontSize = block.style?.fontSize ? parseInt(block.style.fontSize) : isTitle ? 22 : 15;
+
+  const textStyle: React.CSSProperties = {
+    fontFamily: isTitle
+      ? `'${titleFont}', Arial, sans-serif`
+      : `'${bodyFont}', Arial, sans-serif`,
+    fontSize: baseFontSize,
+    lineHeight: isTitle ? '1.3' : '1.75',
+    color: isTitle ? '#111827' : '#374151',
+    fontWeight: isTitle ? 700 : 400,
+    textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'left',
+    margin: 0,
+    letterSpacing: isTitle ? '-0.4px' : '0px',
+  };
+  if (block.style?.color) textStyle.color = block.style.color;
+
+  return (
+    <Section style={{ padding: isTitle ? '28px 40px 4px' : '8px 40px 16px' }}>
+      {isTitle ? (
+        <>
+          {/* Accent line before titles */}
+          <Section
+            style={{
+              width: 36,
+              height: 3,
+              backgroundColor: style.colorPrimary,
+              borderRadius: 2,
+              marginBottom: 14,
+            }}
+          />
+          <Heading as="h2" style={textStyle}>
+            <Lines text={block.content || ''} />
+          </Heading>
+        </>
+      ) : (
+        <Text className="text-main" style={textStyle}>
+          <Lines text={block.content || ''} />
+        </Text>
+      )}
+    </Section>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// IMAGE — Rounded image with optional shadow + spacing
+// ═══════════════════════════════════════════════════════════
+
+const ImageBlock: React.FC<BlockProps> = ({ block }) => (
+  <Section style={{ padding: '20px 40px' }}>
+    {block.imageUrl ? (
+      <Img
+        src={block.imageUrl}
+        alt={block.content || ''}
+        style={{
+          display: 'block',
+          maxWidth: '100%',
+          height: 'auto',
+          borderRadius: 12,
+          margin: '0 auto',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+        }}
+      />
+    ) : (
+      <Section
+        style={{
+          background: 'linear-gradient(145deg, #f3f4f6, #e5e7eb)',
+          height: 200,
+          borderRadius: 12,
+          textAlign: 'center',
+          paddingTop: 75,
+        }}
+      >
+        <Text style={{ color: '#9ca3af', margin: 0, fontSize: 14 }}>
+          📷 {block.content || 'Sube una imagen'}
+        </Text>
+      </Section>
+    )}
+  </Section>
+);
+
+// ═══════════════════════════════════════════════════════════
+// BULLETS — Modern card-style items with accent dots
+// ═══════════════════════════════════════════════════════════
+
+const BulletsBlock: React.FC<BlockProps> = ({ block, style, bodyFont, tint }) => {
+  const items = (block.content || '')
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.replace(/^[•\-]\s*/, ''));
+
+  return (
+    <Section style={{ padding: '16px 40px 20px' }}>
+      {items.map((item, i) => (
+        <Section
+          key={i}
+          style={{
+            padding: '12px 16px',
+            backgroundColor: i % 2 === 0 ? tint : 'transparent',
+            borderRadius: 8,
+            marginBottom: 4,
+          }}
+        >
+          <Row>
+            <Column style={{ width: 28, verticalAlign: 'top', paddingTop: 2 }}>
+              <Section
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: style.colorPrimary,
+                  marginTop: 5,
+                }}
+              />
+            </Column>
+            <Column>
+              <Text
+                className="text-main"
+                style={{
+                  fontFamily: `'${bodyFont}', Arial, sans-serif`,
+                  fontSize: 14,
+                  lineHeight: '1.6',
+                  color: '#374151',
+                  margin: 0,
+                }}
+              >
+                {item}
+              </Text>
+            </Column>
+          </Row>
+        </Section>
+      ))}
+    </Section>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// CTA — Eye-catching button with shadow and Outlook fallback
+// ═══════════════════════════════════════════════════════════
+
+const CtaBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => (
+  <Section style={{ padding: '28px 40px 32px', textAlign: 'center' }}>
+    {/* MSO/Outlook VML fallback */}
+    <Section
+      dangerouslySetInnerHTML={{
+        __html: `<!--[if mso]>
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
+  href="${block.ctaUrl || '#'}" style="height:50px;v-text-anchor:middle;width:240px;" arcsize="16%" fillcolor="${style.colorPrimary}">
+  <w:anchorlock/>
+  <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;">
+    ${block.ctaText || block.content || 'Ver más'}
+  </center>
+</v:roundrect>
+<![endif]-->`,
+      }}
+    />
+    {/* Modern email clients */}
+    <Section
+      dangerouslySetInnerHTML={{
+        __html: `<!--[if !mso]><!-->`,
+      }}
+    />
+    <Button
+      href={block.ctaUrl || '#'}
+      style={{
+        display: 'inline-block',
+        padding: '16px 48px',
+        backgroundColor: style.colorPrimary,
+        background: `linear-gradient(135deg, ${style.colorPrimary}, ${style.colorSecondary})`,
+        color: '#ffffff',
+        fontFamily: `'${titleFont}', Arial, sans-serif`,
+        fontSize: 15,
+        fontWeight: 700,
+        textDecoration: 'none',
+        borderRadius: 10,
+        letterSpacing: '0.2px',
+        boxShadow: `0 4px 16px ${style.colorPrimary}40`,
+        border: 'none',
+      }}
+    >
+      {block.ctaText || block.content || 'Más información'}
+    </Button>
+    <Section
+      dangerouslySetInnerHTML={{
+        __html: `<!--<![endif]-->`,
+      }}
+    />
+  </Section>
+);
+
+// ═══════════════════════════════════════════════════════════
+// DIVIDER — Elegant subtle gradient line
+// ═══════════════════════════════════════════════════════════
+
+const DividerBlock: React.FC<BlockProps> = ({ style }) => (
+  <Section style={{ padding: '16px 40px' }}>
+    <Section
+      style={{
+        height: 1,
+        background: `linear-gradient(90deg, transparent, ${lighten(style.colorPrimary, 0.7)}, transparent)`,
+      }}
+    />
+  </Section>
+);
+
+// ═══════════════════════════════════════════════════════════
+// SPACER — Clean breathing room
+// ═══════════════════════════════════════════════════════════
+
+const SpacerBlock: React.FC = () => (
+  <Section style={{ height: 28, fontSize: 0, lineHeight: '0px' }}>&nbsp;</Section>
+);
+
+// ═══════════════════════════════════════════════════════════
+// FOOTER — Branded bottom with social links area + legal
+// ═══════════════════════════════════════════════════════════
+
+const FooterBlock: React.FC<BlockProps> = ({ block, style, bodyFont, tint }) => (
+  <Section
+    style={{
+      backgroundColor: tint,
+      borderTop: `2px solid ${lighten(style.colorPrimary, 0.8)}`,
+      padding: '32px 40px 28px',
+      textAlign: 'center',
+    }}
+  >
+    {/* Logo */}
+    {style.logoUrl && (
+      <Img
+        src={style.logoUrl}
+        alt=""
+        height={28}
+        style={{
+          height: 28,
+          width: 'auto',
+          display: 'block',
+          margin: '0 auto 16px',
+          opacity: 0.5,
+        }}
+      />
+    )}
+
+    {/* Social icons placeholder row */}
+    <Row style={{ marginBottom: 16 }}>
+      <Column align="center">
+        {['LinkedIn', 'Instagram', 'Web'].map((label) => (
+          <a
+            key={label}
+            href="#"
+            style={{
+              display: 'inline-block',
+              padding: '6px 14px',
+              margin: '0 3px',
+              fontSize: 11,
+              color: style.colorPrimary,
+              textDecoration: 'none',
+              border: `1px solid ${lighten(style.colorPrimary, 0.75)}`,
+              borderRadius: 20,
+              fontFamily: `'${bodyFont}', Arial, sans-serif`,
+              fontWeight: 600,
+            }}
+          >
+            {label}
+          </a>
+        ))}
+      </Column>
+    </Row>
+
+    {/* Divider */}
+    <Hr
+      style={{
+        borderColor: lighten(style.colorPrimary, 0.85),
+        borderTopWidth: 1,
+        margin: '0 0 16px',
+      }}
+    />
+
+    {/* Legal / disclaimer text */}
+    <Text
+      className="text-muted"
+      style={{
+        margin: 0,
+        fontSize: 11,
+        color: '#9ca3af',
+        lineHeight: '1.7',
+        fontFamily: `'${bodyFont}', Arial, sans-serif`,
+      }}
+    >
+      <Lines text={block.content || 'Material exclusivo para profesionales de la salud.'} />
+    </Text>
+
+    {/* Copyright line */}
+    <Text
+      style={{
+        margin: '12px 0 0',
+        fontSize: 10,
+        color: '#c8c8c8',
+        fontFamily: `'${bodyFont}', Arial, sans-serif`,
+      }}
+    >
+      © {new Date().getFullYear()} Todos los derechos reservados.
+    </Text>
+  </Section>
+);
+
+// ═══════════════════════════════════════════════════════════
+// QUOTE — Styled blockquote with accent bar + author
+// ═══════════════════════════════════════════════════════════
+
+const QuoteBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => (
+  <Section style={{ padding: '20px 40px' }}>
+    <Section
+      style={{
+        borderLeft: `4px solid ${style.colorPrimary}`,
+        padding: '20px 24px',
+        backgroundColor: lighten(style.colorPrimary, 0.96),
+        borderRadius: '0 8px 8px 0',
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: `'${bodyFont}', Arial, sans-serif`,
+          fontSize: 16,
+          fontStyle: 'italic',
+          lineHeight: '1.7',
+          color: '#374151',
+          margin: 0,
+        }}
+      >
+        &ldquo;<Lines text={block.content || ''} />&rdquo;
+      </Text>
+      {block.quoteAuthor && (
+        <Text
+          style={{
+            fontFamily: `'${bodyFont}', Arial, sans-serif`,
+            fontSize: 13,
+            color: style.colorPrimary,
+            fontWeight: 600,
+            margin: '12px 0 0',
+          }}
+        >
+          — {block.quoteAuthor}
+        </Text>
+      )}
+    </Section>
+  </Section>
+);
+
+// ═══════════════════════════════════════════════════════════
+// SOCIAL — Row of social link buttons
+// ═══════════════════════════════════════════════════════════
+
+const SOCIAL_ICONS: Record<string, string> = {
+  linkedin: '💼', instagram: '📸', facebook: '👤', twitter: '🐦',
+  youtube: '▶️', tiktok: '🎵', web: '🌐', email: '✉️',
+};
+
+const SocialBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
+  const links = block.socialLinks ?? [
+    { platform: 'linkedin', url: '#' },
+    { platform: 'instagram', url: '#' },
+    { platform: 'web', url: '#' },
+  ];
+  return (
+    <Section style={{ padding: '20px 40px', textAlign: 'center' }}>
+      {block.content && (
+        <Text
+          style={{
+            fontFamily: `'${bodyFont}', Arial, sans-serif`,
+            fontSize: 14,
+            color: '#6b7280',
+            margin: '0 0 12px',
+          }}
+        >
+          {block.content}
+        </Text>
+      )}
+      <Row>
+        <Column align="center">
+          {links.map(({ platform, url }) => (
+            <a
+              key={platform}
+              href={url || '#'}
+              style={{
+                display: 'inline-block',
+                padding: '8px 16px',
+                margin: '0 4px 4px',
+                fontSize: 12,
+                color: style.colorPrimary,
+                textDecoration: 'none',
+                border: `1px solid ${lighten(style.colorPrimary, 0.7)}`,
+                borderRadius: 24,
+                fontFamily: `'${bodyFont}', Arial, sans-serif`,
+                fontWeight: 600,
+              }}
+            >
+              {SOCIAL_ICONS[platform.toLowerCase()] || '🔗'}{' '}
+              {platform.charAt(0).toUpperCase() + platform.slice(1)}
+            </a>
+          ))}
+        </Column>
+      </Row>
+    </Section>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// VIDEO — Thumbnail with play button overlay
+// ═══════════════════════════════════════════════════════════
+
+const VideoBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => {
+  const videoUrl = block.videoUrl || '#';
+  const thumbnail = block.imageUrl;
+
+  return (
+    <Section style={{ padding: '20px 40px' }}>
+      <a href={videoUrl} style={{ display: 'block', textDecoration: 'none' }}>
+        <Section
+          style={{
+            position: 'relative',
+            borderRadius: 12,
+            overflow: 'hidden',
+            background: thumbnail
+              ? undefined
+              : `linear-gradient(160deg, ${lighten(style.colorPrimary, 0.85)} 0%, ${lighten(style.colorSecondary, 0.88)} 100%)`,
+            textAlign: 'center',
+          }}
+        >
+          {thumbnail ? (
+            <Img
+              src={thumbnail}
+              alt={block.content || 'Video'}
+              style={{ display: 'block', width: '100%', height: 'auto', borderRadius: 12 }}
+            />
+          ) : (
+            <Section style={{ padding: '60px 40px' }}>
+              <Section
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 32,
+                  backgroundColor: style.colorPrimary,
+                  margin: '0 auto 14px',
+                  textAlign: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 28, color: '#ffffff', margin: 0, lineHeight: '64px' }}>▶</Text>
+              </Section>
+              <Heading
+                as="h3"
+                style={{
+                  fontFamily: `'${titleFont}', Arial, sans-serif`,
+                  fontSize: 16,
+                  color: style.colorPrimary,
+                  fontWeight: 700,
+                  margin: 0,
+                }}
+              >
+                {block.content || 'Ver video'}
+              </Heading>
+            </Section>
+          )}
+        </Section>
+      </a>
+    </Section>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// HTML — Raw custom HTML block
+// ═══════════════════════════════════════════════════════════
+
+const HtmlBlock: React.FC<BlockProps> = ({ block }) => (
+  <Section style={{ padding: '0 40px' }}>
+    <Section dangerouslySetInnerHTML={{ __html: block.content || '' }} />
+  </Section>
+);
+
+// ═══════════════════════════════════════════════════════════
+// COLUMNS — Two-column layout with text
+// ═══════════════════════════════════════════════════════════
+
+const ColumnsBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
+  const cols = (block.content || '').split('|||').map((c) => c.trim());
+  const left = cols[0] || '';
+  const right = cols[1] || '';
+
+  return (
+    <Section style={{ padding: '16px 40px' }}>
+      <Row>
+        <Column style={{ width: '50%', verticalAlign: 'top', paddingRight: 12 }}>
+          <Text
+            className="text-main"
+            style={{
+              fontFamily: `'${bodyFont}', Arial, sans-serif`,
+              fontSize: 14,
+              lineHeight: '1.7',
+              color: '#374151',
+              margin: 0,
+            }}
+          >
+            <Lines text={left} />
+          </Text>
+        </Column>
+        <Column style={{ width: '50%', verticalAlign: 'top', paddingLeft: 12 }}>
+          <Text
+            className="text-main"
+            style={{
+              fontFamily: `'${bodyFont}', Arial, sans-serif`,
+              fontSize: 14,
+              lineHeight: '1.7',
+              color: '#374151',
+              margin: 0,
+            }}
+          >
+            <Lines text={right} />
+          </Text>
+        </Column>
+      </Row>
+    </Section>
+  );
+};

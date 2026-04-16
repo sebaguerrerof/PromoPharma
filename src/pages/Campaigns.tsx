@@ -31,7 +31,7 @@ function buildBrochureLayoutSpec(
 ): BrochureLayoutSpec {
   const pages = Array.from({ length: pageCount }, (_, i) => ({
     pageNumber: i + 1,
-    backgroundImageUrl: brochureMimeType.startsWith('image/') ? brochureSourceUrl : undefined,
+    ...(brochureMimeType.startsWith('image/') ? { backgroundImageUrl: brochureSourceUrl } : {}),
     zones: [] as BrochureLayoutSpec['pages'][number]['zones'],
   }));
 
@@ -43,7 +43,7 @@ function buildBrochureLayoutSpec(
     const stat = counters.get(pageIdx) ?? { title: 0, subtitle: 0, image: 0, body: 0, bullets: 0, callout: 0, disclaimer: 0 };
     counters.set(pageIdx, stat);
 
-    const base = {
+    const slotTypeMap: Record<string, { x: number; y: number; w: number; h: number; step: number }> = {
       title: { x: 8, y: 10, w: 84, h: 10, step: 10 },
       subtitle: { x: 8, y: 22, w: 84, h: 8, step: 8 },
       image: { x: 8, y: 34, w: 84, h: 34, step: 32 },
@@ -51,7 +51,8 @@ function buildBrochureLayoutSpec(
       bullets: { x: 8, y: 70, w: 84, h: 18, step: 16 },
       callout: { x: 8, y: 70, w: 84, h: 12, step: 12 },
       disclaimer: { x: 6, y: 90, w: 88, h: 7, step: 3 },
-    }[slot.type];
+    };
+    const base = slotTypeMap[slot.type] ?? slotTypeMap['body'];
 
     const offset = stat[slot.type] ?? 0;
     stat[slot.type] = offset + 1;
@@ -247,8 +248,8 @@ const CampaignsPage: React.FC = () => {
       toast('Selecciona una marca', 'error');
       return;
     }
-    if (!createFromBrochure && selectedTemplateIds.length === 0) {
-      toast('Selecciona al menos una plantilla o sube un folleto', 'error');
+    if (selectedTemplateIds.length === 0) {
+      toast('Selecciona al menos una plantilla', 'error');
       return;
     }
     if (createFromBrochure && !brochureFile) {
@@ -272,16 +273,24 @@ const CampaignsPage: React.FC = () => {
         setAnalyzingBrochure(true);
         let uploadedBrochureUrl: string | null = null;
         try {
+          console.log('[Brochure] Paso 1: Analizando diseño...');
           const extractedDesign = await analyzeBrochureDesign(brochureFile!, brand.name, molecule?.name);
+          console.log('[Brochure] Paso 1 OK. Páginas:', extractedDesign.layout.pages);
+          console.log('[Brochure] Paso 2: Subiendo archivo a Storage...');
           const safeName = brochureFile!.name.replace(/[^a-zA-Z0-9._-]/g, '_');
           const brochurePath = `tenants/${tenantId}/brochures/${brand.id}/${Date.now()}_${safeName}`;
           uploadedBrochureUrl = await uploadFile(brochureFile!, brochurePath);
-          const brochureTemplate = templates.find((t) => t.id === 'folleto-2p') ?? templates.find((t) => t.format === 'pdf');
+          console.log('[Brochure] Paso 2 OK. URL:', uploadedBrochureUrl?.slice(0, 80));
+          console.log('[Brochure] Paso 3: Buscando plantilla...', selectedTemplateIds[0]);
+          const brochureTemplate = templates.find((t) => t.id === selectedTemplateIds[0])
+            ?? templates.find((t) => t.id === 'folleto-2p')
+            ?? templates.find((t) => t.format === 'pdf');
 
           if (!brochureTemplate) {
-            toast('No hay plantilla de folleto disponible.', 'error');
+            toast('No hay plantilla disponible.', 'error');
             return;
           }
+          console.log('[Brochure] Paso 3 OK. Template:', brochureTemplate.id, 'Slots:', brochureTemplate.slots.length);
 
           const initialSlotValues: Record<string, string> = {};
           if (brochureTemplate.format === 'pdf') {
@@ -302,6 +311,7 @@ const CampaignsPage: React.FC = () => {
           initialSlotValues['__brochure_fonts'] = JSON.stringify(extractedDesign.fonts ?? []);
           initialSlotValues['__layout_spec'] = JSON.stringify(brochureLayoutSpec);
 
+          console.log('[Brochure] Paso 4: Creando sesión en Firestore...');
           const sessionId = await createSession({
             brandId: brand.id,
             brandName: brand.name,
@@ -327,12 +337,14 @@ const CampaignsPage: React.FC = () => {
             },
             brochureLayoutSpec,
           });
+          console.log('[Brochure] Paso 4 OK. Session:', sessionId);
           toast('Campaña creada desde folleto — redirigiendo al chat IA');
           const brochurePrompt = `Usa como referencia el folleto "${brochureFile!.name}" para mantener estilo visual, jerarquía y tono. Actualiza solo el contenido para ${brand.name} sin inventar claims.`;
           const finalPrompt = initialPrompt.trim() || brochurePrompt;
           const promptParam = `&prompt=${encodeURIComponent(finalPrompt)}`;
           navigate(`/marcas/${brand.id}/generar?session=${sessionId}${promptParam}`);
         } catch (error) {
+          console.error('[Brochure] Error en flujo de creación:', error);
           if (uploadedBrochureUrl) {
             await deleteFileByUrl(uploadedBrochureUrl).catch(() => {});
           }
@@ -529,8 +541,8 @@ const CampaignsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* 2. Plantilla(s) o Folleto */}
-              {createFromBrochure ? (
+              {/* 2a. Upload de folleto (solo visible en modo brochure) */}
+              {createFromBrochure && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                     <span className="inline-flex items-center gap-1.5">
@@ -579,71 +591,94 @@ const CampaignsPage: React.FC = () => {
                       {brochureFile ? 'Cambiar archivo' : 'Seleccionar archivo'}
                     </label>
                   </div>
+                  {brochureFile && (
+                    <p className="text-xs text-blue-600 mt-2 ml-1">
+                      El diseño del folleto se aplicará a la plantilla que elijas abajo.
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center">2</span>
-                      Plantilla{selectedTemplateIds.length > 1 ? 's' : ''}
-                    </span>
+              )}
+
+              {/* 2b. Plantillas (siempre visibles) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center">{createFromBrochure ? '3' : '2'}</span>
+                    Plantilla{selectedTemplateIds.length > 1 ? 's' : ''}
+                  </span>
+                  {!createFromBrochure && (
                     <span className="text-xs font-normal text-gray-400 ml-2">
                       Selecciona varias para crear un Kit
                     </span>
-                  </label>
-
-                  {selectedTemplateIds.length > 1 && (
-                    <div className="mb-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2">
-                      <span className="text-sm">📦</span>
-                      <span className="text-xs font-medium text-purple-700">
-                        Kit de campaña — {selectedTemplateIds.length} piezas se generarán con el mismo mensaje
-                      </span>
-                    </div>
                   )}
+                  {createFromBrochure && (
+                    <span className="text-xs font-normal text-gray-400 ml-2">
+                      Elige qué tipo de pieza generar con el diseño del folleto
+                    </span>
+                  )}
+                </label>
 
-                  {templates.length === 0 ? (
-                    <p className="text-sm text-gray-400">No hay plantillas disponibles.</p>
-                  ) : (
-                    <div className="grid gap-2">
-                      {templates.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => toggleTemplate(t.id)}
-                          className={`text-left border rounded-lg p-3 transition-colors ${
-                            selectedTemplateIds.includes(t.id)
-                              ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
-                              : t.featured
-                                ? 'border-purple-200 bg-purple-50/30 hover:border-purple-300'
-                                : 'border-gray-200 hover:border-gray-300 bg-white'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                {!createFromBrochure && selectedTemplateIds.length > 1 && (
+                  <div className="mb-2 px-3 py-2 bg-purple-50 border border-purple-200 rounded-lg flex items-center gap-2">
+                    <span className="text-sm">📦</span>
+                    <span className="text-xs font-medium text-purple-700">
+                      Kit de campaña — {selectedTemplateIds.length} piezas se generarán con el mismo mensaje
+                    </span>
+                  </div>
+                )}
+
+                {templates.length === 0 ? (
+                  <p className="text-sm text-gray-400">No hay plantillas disponibles.</p>
+                ) : (
+                  <div className="grid gap-2">
+                    {templates.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => createFromBrochure ? setSelectedTemplateIds([t.id]) : toggleTemplate(t.id)}
+                        className={`text-left border rounded-lg p-3 transition-colors ${
+                          selectedTemplateIds.includes(t.id)
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                            : t.featured
+                              ? 'border-purple-200 bg-purple-50/30 hover:border-purple-300'
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {createFromBrochure ? (
+                              <input
+                                type="radio"
+                                name="brochure-template"
+                                checked={selectedTemplateIds.includes(t.id)}
+                                onChange={() => setSelectedTemplateIds([t.id])}
+                                className="border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                            ) : (
                               <input
                                 type="checkbox"
                                 checked={selectedTemplateIds.includes(t.id)}
                                 onChange={() => toggleTemplate(t.id)}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
-                              <h3 className="text-sm font-medium text-gray-900">{t.name}</h3>
-                              {t.featured && (
-                                <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600 tracking-wider">
-                                  Recomendado
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] uppercase text-gray-400 font-medium px-1.5 py-0.5 bg-gray-100 rounded">
-                              {t.format}
-                            </span>
+                            )}
+                            <h3 className="text-sm font-medium text-gray-900">{t.name}</h3>
+                            {t.featured && (
+                              <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-600 tracking-wider">
+                                Recomendado
+                              </span>
+                            )}
                           </div>
-                          <p className="text-xs text-gray-500 mt-0.5 ml-6">{t.description}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                          <span className="text-[10px] uppercase text-gray-400 font-medium px-1.5 py-0.5 bg-gray-100 rounded">
+                            {t.format}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5 ml-6">{t.description}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Número de páginas (solo para folletos) */}
 
@@ -805,7 +840,7 @@ const CampaignsPage: React.FC = () => {
                       setGeneratingPrompt(false);
                     }
                   }}
-                  disabled={generatingPrompt || !selectedBrandId || (!createFromBrochure && selectedTemplateIds.length === 0)}
+                  disabled={generatingPrompt || !selectedBrandId || selectedTemplateIds.length === 0}
                   className="absolute bottom-2 right-2 flex items-center gap-1.5 rounded-md bg-linear-to-r
                              from-blue-500 to-cyan-500 px-3 py-1.5 text-xs font-medium text-white
                              hover:from-blue-600 hover:to-cyan-600 transition-all
@@ -834,7 +869,7 @@ const CampaignsPage: React.FC = () => {
               </button>
               <button
                 onClick={handleCreateCampaign}
-                disabled={creating || analyzingBrochure || !selectedBrandId || (!createFromBrochure && selectedTemplateIds.length === 0) || (createFromBrochure && !brochureFile)}
+                disabled={creating || analyzingBrochure || !selectedBrandId || selectedTemplateIds.length === 0 || (createFromBrochure && !brochureFile)}
                 className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white
                            hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed
                            flex items-center gap-2"

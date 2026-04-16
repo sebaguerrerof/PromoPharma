@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Timestamp } from 'firebase/firestore';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/firebase/config';
-import type { Template, TemplateSlot } from '@/types';
+import type { Template, TemplateSlot, DesignBlock, DesignLayout } from '@/types';
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
@@ -184,4 +184,105 @@ export const SUPPORTED_DESIGN_FILES = [
  */
 export function isSupportedDesignFile(file: File): boolean {
   return SUPPORTED_DESIGN_FILES.includes(file.type);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Email Design Analysis (image/PDF → DesignLayout)
+// ═══════════════════════════════════════════════════════════
+
+export interface ExtractedEmailDesign {
+  name: string;
+  description: string;
+  layout: DesignLayout;
+  detectedColors: string[];
+  detectedFonts: string[];
+}
+
+/**
+ * Analyzes an uploaded email screenshot or PDF and extracts a DesignLayout
+ * that can be saved as a custom DesignTemplate.
+ */
+export async function analyzeEmailDesign(file: File): Promise<ExtractedEmailDesign> {
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+  const base64 = await fileToBase64(file);
+
+  const prompt = `Analyze this email design image and extract its EXACT block structure as a JSON layout.
+
+You are an expert email designer. Identify every visual section/block in this email and map it to these block types:
+- header: top bar with logo/brand
+- hero: large banner image
+- text: paragraph or title text
+- image: standalone image
+- cta: button / call-to-action
+- footer: bottom section with legal text
+- spacer: empty space between blocks
+- divider: horizontal line separator
+- bullets: bullet point list
+- columns: side-by-side content
+
+For each block, estimate its position as percentages of the total email:
+- x: horizontal position (0-100, usually 0 for full-width or 5-10 for padded)
+- y: vertical position from top (0-100)
+- w: width percentage (0-100)
+- h: height percentage (0-100, relative to total email height)
+
+Also detect:
+1. The dominant colors (as hex codes)
+2. The fonts used (or closest match)
+3. A descriptive name for this design
+
+RESPOND ONLY with valid JSON:
+{
+  "name": "Descriptive template name",
+  "description": "Brief description of the email's style and purpose",
+  "detectedColors": ["#hex1", "#hex2"],
+  "detectedFonts": ["Font1", "Font2"],
+  "blocks": [
+    { "id": "block-1", "type": "header", "x": 0, "y": 0, "w": 100, "h": 8, "defaultContent": "Logo text" },
+    { "id": "block-2", "type": "hero", "x": 0, "y": 8, "w": 100, "h": 25, "defaultContent": "Hero image" },
+    ...more blocks...
+  ]
+}`;
+
+  const result = await model.generateContent([
+    prompt,
+    { inlineData: { mimeType: file.type, data: base64.split(',')[1] } },
+  ]);
+
+  const text = result.response.text().trim();
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('No se pudo analizar el diseño del email.');
+
+  const parsed = JSON.parse(jsonMatch[0]) as {
+    name: string;
+    description: string;
+    detectedColors: string[];
+    detectedFonts: string[];
+    blocks: (DesignBlock & { defaultContent?: string })[];
+  };
+
+  if (!parsed.blocks || parsed.blocks.length === 0) {
+    throw new Error('No se detectaron bloques en el diseño.');
+  }
+
+  return {
+    name: parsed.name || 'Diseño importado',
+    description: parsed.description || 'Diseño extraído de imagen subida.',
+    layout: {
+      width: 600,
+      height: 800,
+      blocks: parsed.blocks.map((b, i) => ({
+        id: b.id || `block-${i + 1}`,
+        type: b.type,
+        x: Math.max(0, Math.min(100, b.x)),
+        y: Math.max(0, Math.min(100, b.y)),
+        w: Math.max(5, Math.min(100, b.w)),
+        h: Math.max(2, Math.min(50, b.h)),
+        defaultContent: b.defaultContent,
+        style: b.style,
+      })),
+    },
+    detectedColors: parsed.detectedColors ?? [],
+    detectedFonts: parsed.detectedFonts ?? [],
+  };
 }

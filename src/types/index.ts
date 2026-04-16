@@ -293,3 +293,165 @@ export interface GenerationSession {
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+
+// ── M5: Design Library (CRM de Diseños) ─────────────────
+
+export type DesignCategory = 'email' | 'brochure' | 'banner' | 'presentation' | 'custom';
+export type DesignSource = 'system' | 'imported' | 'created';
+
+export const DESIGN_CATEGORY_LABELS: Record<DesignCategory, string> = {
+  email: 'Email',
+  brochure: 'Folleto',
+  banner: 'Banner',
+  presentation: 'Presentación',
+  custom: 'Personalizado',
+};
+
+export type DesignBlockType =
+  | 'header'
+  | 'hero'
+  | 'text'
+  | 'image'
+  | 'cta'
+  | 'footer'
+  | 'spacer'
+  | 'divider'
+  | 'bullets'
+  | 'columns'
+  | 'quote'
+  | 'social'
+  | 'video';
+
+export interface DesignBlock {
+  id: string;
+  type: DesignBlockType;
+  /** Posición y tamaño en porcentaje (0-100) */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Contenido por defecto (placeholder) */
+  defaultContent?: string;
+  /** Estilos inline opcionales */
+  style?: Record<string, string>;
+}
+
+export interface DesignLayout {
+  /** Ancho base en px (ej: 600 para email) */
+  width: number;
+  /** Alto base en px */
+  height: number;
+  blocks: DesignBlock[];
+}
+
+export interface DesignTemplate {
+  id: string;
+  name: string;
+  /** Marca asociada (null = diseño global) */
+  brandId: string | null;
+  brandName: string | null;
+  category: DesignCategory;
+  /** URL de thumbnail preview */
+  thumbnailUrl: string;
+  layout: DesignLayout;
+  style: {
+    colorPrimary: string;
+    colorSecondary: string;
+    colorBackground: string;
+    fontTitle: string;
+    fontBody: string;
+    variant: string;
+  };
+  source: DesignSource;
+  /** URL del archivo original si fue importado */
+  sourceFileUrl?: string;
+  tenantId: string;
+  createdBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// ── M6: Mailing ─────────────────────────────────────────
+
+export type MailingStatus = 'draft' | 'ready' | 'sent';
+
+export interface MailingBlockContent {
+  id: string;
+  type: DesignBlockType;
+  content: string;
+  /** URL de imagen si type=image, hero, video thumbnail */
+  imageUrl?: string;
+  /** Texto del botón si type=cta */
+  ctaText?: string;
+  /** URL del botón si type=cta */
+  ctaUrl?: string;
+  /** URL del video (YouTube/Vimeo) si type=video */
+  videoUrl?: string;
+  /** Autor de la cita si type=quote */
+  quoteAuthor?: string;
+  /** Links de redes sociales si type=social [{platform, url}] */
+  socialLinks?: { platform: string; url: string }[];
+  /** Fondo personalizado del bloque */
+  backgroundColor?: string;
+  /** Imagen de fondo del bloque */
+  backgroundImage?: string;
+  /** Padding personalizado */
+  paddingTop?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
+  paddingRight?: number;
+  /** Texto de fecha editable (header) */
+  dateText?: string;
+  /** Alto del logo en px (header) */
+  logoHeight?: number;
+  /** Posición X del logo en % (0-100) relativo al header */
+  logoX?: number;
+  /** Posición Y del logo en % (0-100) relativo al header */
+  logoY?: number;
+  style?: Record<string, string>;
+}
+
+export interface MailingProject {
+  id: string;
+  /** Nombre del email (ej: "Newsletter Marzo 2026") */
+  name: string;
+  /** Asunto del email */
+  subject: string;
+  brandId: string;
+  brandName: string;
+  /** ID del diseño base usado */
+  designTemplateId: string;
+  designTemplateName: string;
+  /** Contenido de cada bloque editado */
+  blocks: MailingBlockContent[];
+  /** Layout copiado del DesignTemplate al crear */
+  layout: DesignLayout;
+  /** Estilos aplicados (heredados de marca + diseño) */
+  style: {
+    colorPrimary: string;
+    colorSecondary: string;
+    colorBackground: string;
+    fontTitle: string;
+    fontBody: string;
+    /** Logo URL de la marca */
+    logoUrl?: string;
+  };
+  /** Configuración global del email */
+  emailSettings?: {
+    /** Color de fondo del body (outer background) */
+    bodyBackground?: string;
+    /** Imagen de fondo del body */
+    bodyBackgroundImage?: string;
+    /** Ancho del contenedor (default: layout.width) */
+    containerWidth?: number;
+    /** Bordes redondeados del contenedor */
+    borderRadius?: number;
+    /** Preheader text */
+    preheaderText?: string;
+  };
+  status: MailingStatus;
+  tenantId: string;
+  createdBy: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}

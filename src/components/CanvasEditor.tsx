@@ -223,6 +223,72 @@ function EditableImage({
   );
 }
 
+// ── Draggable Logo ──────────────────────────────────────
+
+interface DraggableLogoProps {
+  src: string;
+  alt: string;
+  size: string;        // CSS value like "4rem"
+  offsetX: number;
+  offsetY: number;
+  onDragEnd: (x: number, y: number) => void;
+  onSelect: () => void;
+  isSelected: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+function DraggableLogo({ src, alt, size, offsetX, offsetY, onDragEnd, onSelect, isSelected, className = '', style = {} }: DraggableLogoProps) {
+  const elRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+  const startMouse = useRef({ x: 0, y: 0 });
+  const startOff = useRef({ x: 0, y: 0 });
+  const [pos, setPos] = useState({ x: offsetX, y: offsetY });
+
+  useEffect(() => {
+    if (!dragging.current) setPos({ x: offsetX, y: offsetY });
+  }, [offsetX, offsetY]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSelect();
+    dragging.current = true;
+    startMouse.current = { x: e.clientX, y: e.clientY };
+    startOff.current = { ...pos };
+    if (elRef.current) elRef.current.style.zIndex = '30';
+
+    const handleMove = (ev: PointerEvent) => {
+      if (!dragging.current) return;
+      setPos({
+        x: startOff.current.x + (ev.clientX - startMouse.current.x),
+        y: startOff.current.y + (ev.clientY - startMouse.current.y),
+      });
+    };
+    const handleUp = () => {
+      dragging.current = false;
+      if (elRef.current) elRef.current.style.zIndex = '';
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      setPos(prev => { onDragEnd(prev.x, prev.y); return prev; });
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
+  return (
+    <div
+      ref={elRef}
+      className={`inline-block cursor-grab active:cursor-grabbing ${isSelected ? 'ring-2 ring-blue-400 ring-offset-2 rounded-lg' : 'hover:ring-1 hover:ring-blue-200 rounded-lg'}`}
+      style={{ transform: `translate(${pos.x}px, ${pos.y}px)`, transition: dragging.current ? 'none' : 'transform 0.15s ease' }}
+      onPointerDown={handlePointerDown}
+      onClick={(e) => { e.stopPropagation(); onSelect(); }}
+    >
+      <img src={src} alt={alt} className={`object-contain ${className}`} style={{ height: size, width: size, ...style }} />
+    </div>
+  );
+}
+
 // ── Draggable wrapper for slots ─────────────────────────
 
 interface DraggableSlotProps {
@@ -754,22 +820,30 @@ export default function CanvasEditor({
 
   // -- Logo visual params helpers --
   const logoScale = parseFloat(slotValues['__logo_scale'] || '1') || 1;
-  const logoPosition = (slotValues['__logo_position'] || 'left') as 'left' | 'center' | 'right';
+  const logoX = parseFloat(slotValues['__logo_x'] || '0') || 0;
+  const logoY = parseFloat(slotValues['__logo_y'] || '0') || 0;
+  const isLogoSelected = selectedSlot === '__logo';
 
   const setLogoScale = (v: number) => {
-    const clamped = Math.max(0.5, Math.min(3, v));
+    const clamped = Math.max(0.3, Math.min(5, v));
     handleSlotChange('__logo_scale', clamped.toFixed(1));
   };
-  const setLogoPosition = (v: 'left' | 'center' | 'right') => {
-    handleSlotChange('__logo_position', v);
+  const setLogoX = (v: number) => {
+    handleSlotChange('__logo_x', Math.round(v).toString());
+  };
+  const setLogoY = (v: number) => {
+    handleSlotChange('__logo_y', Math.round(v).toString());
+  };
+  const handleLogoDragEnd = (x: number, y: number) => {
+    setLogoX(x);
+    setLogoY(y);
+  };
+  const handleLogoSelect = () => {
+    setSelectedSlot('__logo');
   };
 
   /** CSS size for logo based on scale. baseRem = base size in rem */
   const logoSize = (baseRem: number) => `${baseRem * logoScale}rem`;
-
-  /** CSS justify/align class for logo position */
-  const logoPosClass = logoPosition === 'center' ? 'mx-auto' : logoPosition === 'right' ? 'ml-auto' : '';
-  const logoPosFlexClass = logoPosition === 'center' ? 'justify-center' : logoPosition === 'right' ? 'justify-end' : 'justify-start';
 
   // ── Handlers ──────────────────────────────────────────
 
@@ -1136,9 +1210,11 @@ export default function CanvasEditor({
             })()}
             <div className="relative z-10 max-w-2xl mx-auto">
               {brand.params.logoUrl && (
-                <img src={brand.params.logoUrl} alt={`${brand.name} logo`}
-                  className={`rounded-lg object-contain bg-white/90 p-2 shadow-md mb-6 ${logoPosClass}`}
-                  style={{ height: logoSize(4), width: logoSize(4) }} />
+                <DraggableLogo src={brand.params.logoUrl} alt={`${brand.name} logo`}
+                  size={logoSize(4)} offsetX={logoX} offsetY={logoY}
+                  onDragEnd={handleLogoDragEnd} onSelect={handleLogoSelect}
+                  isSelected={isLogoSelected}
+                  className="rounded-lg bg-white/90 p-2 shadow-md mb-6" />
               )}
               {slideGroup.slots.filter(s => s.type !== 'image').map(slot => {
                 const val = slotValues[slot.id];
@@ -1176,9 +1252,11 @@ export default function CanvasEditor({
                 Slide {slideGroup.slideNumber}
               </span>
               {brand.params.logoUrl && (
-                <img src={brand.params.logoUrl} alt={brand.name}
-                  className="object-contain opacity-60"
-                  style={{ height: logoSize(2), width: logoSize(2) }} />
+                <DraggableLogo src={brand.params.logoUrl} alt={brand.name}
+                  size={logoSize(2)} offsetX={logoX} offsetY={logoY}
+                  onDragEnd={handleLogoDragEnd} onSelect={handleLogoSelect}
+                  isSelected={isLogoSelected}
+                  className="opacity-60" />
               )}
             </div>
             <div className="flex-1">
@@ -1228,11 +1306,13 @@ export default function CanvasEditor({
         {isFirstPage ? (
           <div className={vHeader.wrapper.className} style={vHeader.wrapper.style}>
             {vHeader.decoration && <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>{vHeader.decoration}</div>}
-            <div className={`flex items-center gap-4 ${logoPosFlexClass} relative z-10`}>
+            <div className={`flex items-center gap-4 relative z-10`}>
               {brand.params.logoUrl && (
-                <img src={brand.params.logoUrl} alt={`${brand.name} logo`}
-                  className={vHeader.logoClass}
-                  style={{ height: logoSize(3.5), width: logoSize(3.5) }} />
+                <DraggableLogo src={brand.params.logoUrl} alt={`${brand.name} logo`}
+                  size={logoSize(3.5)} offsetX={logoX} offsetY={logoY}
+                  onDragEnd={handleLogoDragEnd} onSelect={handleLogoSelect}
+                  isSelected={isLogoSelected}
+                  className={vHeader.logoClass} />
               )}
               <div>
                 <h2 className={vHeader.title.className}
@@ -1902,7 +1982,11 @@ export default function CanvasEditor({
           {/* Logo controls */}
           {brand.params.logoUrl && (
             <div className="p-4 border-t border-gray-100">
-              <h3 className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-3">Logo</h3>
+              <h3 className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold mb-3">
+                Logo
+                {isLogoSelected && <span className="ml-1 text-blue-500">· seleccionado</span>}
+              </h3>
+              <p className="text-[10px] text-gray-400 mb-3 leading-relaxed">Arrastra el logo directamente en el canvas, o usa los controles:</p>
 
               {/* Scale slider */}
               <div className="mb-3">
@@ -1911,33 +1995,57 @@ export default function CanvasEditor({
                   <span className="text-[11px] font-mono text-gray-600">{logoScale.toFixed(1)}x</span>
                 </div>
                 <input
-                  type="range" min="0.5" max="3" step="0.1"
+                  type="range" min="0.3" max="5" step="0.1"
                   value={logoScale}
                   onChange={(e) => setLogoScale(parseFloat(e.target.value))}
                   className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
                 <div className="flex justify-between text-[9px] text-gray-300 mt-0.5">
-                  <span>0.5x</span><span>1.0x</span><span>2.0x</span><span>3.0x</span>
+                  <span>0.3x</span><span>1x</span><span>3x</span><span>5x</span>
                 </div>
               </div>
 
-              {/* Position buttons */}
-              <div>
-                <span className="text-[11px] text-gray-500 block mb-1.5">Posición</span>
-                <div className="flex gap-1">
-                  {(['left', 'center', 'right'] as const).map((pos) => (
-                    <button key={pos}
-                      onClick={(e) => { e.stopPropagation(); setLogoPosition(pos); }}
-                      className={`flex-1 text-[10px] font-medium py-1.5 rounded-md border transition-colors ${
-                        logoPosition === pos
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
-                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                      }`}>
-                      {pos === 'left' ? 'Izq' : pos === 'center' ? 'Centro' : 'Der'}
-                    </button>
-                  ))}
+              {/* Horizontal (X) slider */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] text-gray-500">Horizontal</span>
+                  <span className="text-[11px] font-mono text-gray-600">{logoX}px</span>
+                </div>
+                <input
+                  type="range" min="-300" max="300" step="1"
+                  value={logoX}
+                  onChange={(e) => setLogoX(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[9px] text-gray-300 mt-0.5">
+                  <span>-300</span><span>0</span><span>+300</span>
                 </div>
               </div>
+
+              {/* Vertical (Y) slider */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] text-gray-500">Vertical</span>
+                  <span className="text-[11px] font-mono text-gray-600">{logoY}px</span>
+                </div>
+                <input
+                  type="range" min="-300" max="300" step="1"
+                  value={logoY}
+                  onChange={(e) => setLogoY(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+                <div className="flex justify-between text-[9px] text-gray-300 mt-0.5">
+                  <span>-300</span><span>0</span><span>+300</span>
+                </div>
+              </div>
+
+              {/* Reset button */}
+              <button
+                onClick={(e) => { e.stopPropagation(); setLogoX(0); setLogoY(0); setLogoScale(1); }}
+                className="w-full text-[10px] font-medium py-1.5 rounded-md border bg-white border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
+              >
+                Restablecer posición
+              </button>
             </div>
           )}
 

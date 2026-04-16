@@ -15,6 +15,8 @@ import GeneratePage from './pages/Generate';
 import PublicationPage from './pages/Publication';
 import CampaignsPage from './pages/Campaigns';
 import KnowledgeBankPage from './pages/KnowledgeBank';
+import MailingPage from './pages/Mailing';
+import MailingEditorPage from './pages/MailingEditor';
 
 const App: React.FC = () => (
   <AuthProvider>
@@ -42,6 +44,9 @@ const App: React.FC = () => (
             <Route path="/marcas/:brandId/generar" element={<GeneratePage />} />
             <Route path="/campanas" element={<CampaignsPage />} />
             <Route path="/conocimiento" element={<KnowledgeBankPage />} />
+            <Route path="/mailing" element={<MailingPage />} />
+            <Route path="/mailing/new" element={<MailingEditorPage />} />
+            <Route path="/mailing/:id" element={<MailingEditorPage />} />
             <Route path="/publicaciones/:sessionId" element={<PublicationPage />} />
           </Route>
 
