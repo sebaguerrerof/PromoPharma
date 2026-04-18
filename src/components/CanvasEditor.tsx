@@ -1307,25 +1307,26 @@ export default function CanvasEditor({
           <div className={vHeader.wrapper.className} style={vHeader.wrapper.style}>
             {vHeader.decoration && <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>{vHeader.decoration}</div>}
             <div className={`flex items-center gap-4 relative z-10`}>
-              {brand.params.logoUrl && (
+              {brand.params.logoUrl ? (
                 <DraggableLogo src={brand.params.logoUrl} alt={`${brand.name} logo`}
                   size={logoSize(3.5)} offsetX={logoX} offsetY={logoY}
                   onDragEnd={handleLogoDragEnd} onSelect={handleLogoSelect}
                   isSelected={isLogoSelected}
                   className={vHeader.logoClass} />
+              ) : (
+                <div>
+                  <h2 className={vHeader.title.className}
+                    style={{ ...vHeader.title.style, fontFamily: brand.params.fontTitle || 'inherit', color: '#ffffff' }}>
+                    {brand.name}
+                  </h2>
+                  {session.moleculeName && (
+                    <p className={vHeader.subtitle.className} style={{ ...vHeader.subtitle.style, color: 'rgba(255,255,255,0.7)' }}>
+                      {session.moleculeName}
+                      {session.indicationNames.length > 0 && ` — ${session.indicationNames.join(', ')}`}
+                    </p>
+                  )}
+                </div>
               )}
-              <div>
-                <h2 className={vHeader.title.className}
-                  style={{ ...vHeader.title.style, fontFamily: brand.params.fontTitle || 'inherit' }}>
-                  {brand.name}
-                </h2>
-                {session.moleculeName && (
-                  <p className={vHeader.subtitle.className} style={vHeader.subtitle.style}>
-                    {session.moleculeName}
-                    {session.indicationNames.length > 0 && ` — ${session.indicationNames.join(', ')}`}
-                  </p>
-                )}
-              </div>
             </div>
           </div>
         ) : (

@@ -42,7 +42,15 @@ import { uploadFile } from '@/services/uploadService';
 import { getBrandKnowledge } from '@/services/knowledgeService';
 import { getInsightsByStatus } from '@/services/insightService';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import type { Brand, DesignTemplate, MailingProject, MailingBlockContent, DesignBlockType } from '@/types';
+import AIMailingPanel from '@/components/mailing/AIMailingPanel';
+import EmailTypeSelector from '@/components/mailing/EmailTypeSelector';
+import type { AIMailingResponse } from '@/services/aiMailingContext';
+import {
+  createTextBankEntry,
+  extractTextsFromBlocks,
+  determineSource,
+} from '@/services/brandTextBankService';
+import type { Brand, DesignTemplate, MailingProject, MailingBlockContent, DesignBlockType, TextBankEmailType } from '@/types';
 
 // ── Step indicators ──────────────────────────────────────
 
@@ -87,6 +95,15 @@ const MailingEditor: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [step, setStep] = useState<Step>('brand');
+  const [showAIPanel, setShowAIPanel] = useState(false);
+
+  // AI tracking — para Brand Text Bank
+  const [isAIGenerated, setIsAIGenerated] = useState(false);
+  const [originalAIBlocks, setOriginalAIBlocks] = useState<MailingBlockContent[] | null>(null);
+  const [aiEmailType, setAiEmailType] = useState<TextBankEmailType | null>(null);
+  const [aiContext, setAiContext] = useState<{ userPrompt: string; reasoning?: string; tone?: string; length?: string } | null>(null);
+  const [showTypeSelector, setShowTypeSelector] = useState(false);
+  const [pendingSaveCallback, setPendingSaveCallback] = useState<(() => void) | null>(null);
 
   // Step 1: Brand selection
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -205,6 +222,26 @@ const MailingEditor: React.FC = () => {
     setStep('editor');
   };
 
+  const handleAIGenerated = (response: AIMailingResponse, meta: { emailType: string; userPrompt: string; tone?: string; length?: string }) => {
+    setBlocks(response.blocks);
+    setSubject(response.subject);
+    setProjectName(response.projectName);
+    setEmailSettings({
+      preheaderText: response.emailSettings.preheaderText,
+      bodyBackground: response.emailSettings.bodyBackground,
+      containerWidth: response.emailSettings.containerWidth,
+      borderRadius: response.emailSettings.borderRadius,
+    });
+    // AI tracking
+    setIsAIGenerated(true);
+    setOriginalAIBlocks(structuredClone(response.blocks));
+    setAiEmailType(meta.emailType as TextBankEmailType);
+    setAiContext({ userPrompt: meta.userPrompt, tone: meta.tone, length: meta.length });
+    setShowAIPanel(false);
+    setStep('editor');
+    toast('Email generado con IA', 'success');
+  };
+
   const handleBlockChange = (blockId: string, updates: Partial<MailingBlockContent>) => {
     setBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, ...updates } : b)),
@@ -287,14 +324,53 @@ const MailingEditor: React.FC = () => {
     return obj;
   };
 
+  const saveToBrandTextBank = async (projectId: string) => {
+    if (!selectedBrand || !user) return;
+    const emailType = aiEmailType ?? 'otro';
+    const source = determineSource(isAIGenerated, originalAIBlocks, blocks);
+    try {
+      await createTextBankEntry({
+        tenantId,
+        brandId: selectedBrand.id,
+        brandName: selectedBrand.name,
+        mailingProjectId: projectId,
+        emailType,
+        source,
+        subject,
+        tags: [],
+        texts: extractTextsFromBlocks(blocks),
+        blockSequence: blocks.map((b) => b.type),
+        createdBy: user.uid,
+        aiContext: aiContext
+          ? { userPrompt: aiContext.userPrompt, tone: aiContext.tone, length: aiContext.length }
+          : undefined,
+      });
+    } catch (err) {
+      console.error('[TextBank] Error al guardar en brand text bank:', err);
+    }
+  };
+
   const handleSave = async () => {
     if (!user) return;
+
+    // Si es email manual sin emailType → pedir tipo primero
+    if (!isAIGenerated && !aiEmailType && !isEditing) {
+      setShowTypeSelector(true);
+      setPendingSaveCallback(() => () => performSave());
+      return;
+    }
+
+    await performSave();
+  };
+
+  const performSave = async () => {
     setSaving(true);
     try {
       const cleanBlocks = sanitize(blocks) as MailingBlockContent[];
       if (isEditing && project) {
         await updateMailingBlocks(project.id, cleanBlocks);
         await updateMailingProject(project.id, { name: projectName, subject });
+        await saveToBrandTextBank(project.id);
         toast('Email guardado', 'success');
       } else if (selectedBrand && selectedDesign) {
         const newId = await createMailingProject({
@@ -305,8 +381,9 @@ const MailingEditor: React.FC = () => {
           designTemplate: selectedDesign,
           style: computedStyle,
           tenantId,
-          createdBy: user.uid,
+          createdBy: user!.uid,
         });
+        await saveToBrandTextBank(newId);
         toast('Email creado', 'success');
         navigate(`/mailing/${newId}`, { replace: true });
       }
@@ -441,6 +518,7 @@ const MailingEditor: React.FC = () => {
           brandStyle={computedStyle}
           onSelect={handleSelectDesign}
           onUploadComplete={(d) => setCustomDesigns((prev) => [d, ...prev])}
+          onOpenAI={() => setShowAIPanel(true)}
           tenantId={tenantId}
           userId={user?.uid ?? ''}
         />
@@ -479,6 +557,34 @@ const MailingEditor: React.FC = () => {
           onBack={() => setStep('editor')}
           subject={subject}
           projectName={projectName}
+        />
+      )}
+
+      {/* AI Mailing Panel */}
+      {showAIPanel && selectedBrand && (
+        <AIMailingPanel
+          brand={selectedBrand}
+          tenantId={tenantId}
+          onGenerated={handleAIGenerated}
+          onClose={() => setShowAIPanel(false)}
+        />
+      )}
+
+      {/* Email Type Selector — para emails manuales sin tipo */}
+      {showTypeSelector && (
+        <EmailTypeSelector
+          onSelect={(type) => {
+            setAiEmailType(type);
+            setShowTypeSelector(false);
+            pendingSaveCallback?.();
+            setPendingSaveCallback(null);
+          }}
+          onSkip={() => {
+            setAiEmailType('otro');
+            setShowTypeSelector(false);
+            pendingSaveCallback?.();
+            setPendingSaveCallback(null);
+          }}
         />
       )}
     </div>
@@ -544,9 +650,10 @@ const StepDesign: React.FC<{
   brandStyle: MailingProject['style'];
   onSelect: (d: SystemDesignTemplate | DesignTemplate) => void;
   onUploadComplete?: (d: DesignTemplate) => void;
+  onOpenAI?: () => void;
   tenantId: string;
   userId: string;
-}> = ({ systemDesigns, customDesigns, brandStyle, onSelect, onUploadComplete, tenantId, userId }) => {
+}> = ({ systemDesigns, customDesigns, brandStyle, onSelect, onUploadComplete, onOpenAI, tenantId, userId }) => {
   const [activeTag, setActiveTag] = useState<EmailDesignTag | 'all' | 'custom'>('all');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -653,8 +760,20 @@ const StepDesign: React.FC<{
             {totalCount} diseños disponibles. Elige la estructura y luego edita cada bloque.
           </p>
         </div>
-        {/* Upload button */}
-        <div className="flex-shrink-0 ml-4">
+        {/* Action buttons */}
+        <div className="shrink-0 ml-4 flex items-center gap-2">
+          {/* AI Generate button */}
+          {onOpenAI && (
+            <button
+              onClick={onOpenAI}
+              className="px-4 py-2.5 bg-linear-to-r from-blue-600 to-cyan-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-cyan-700 transition flex items-center gap-2 shadow-md shadow-blue-500/20"
+            >
+              <span className="text-base">✨</span>
+              Crear con AI
+            </button>
+          )}
+          {/* Upload button */}
+          <div>
           <input
             ref={fileInputRef}
             type="file"
@@ -685,6 +804,7 @@ const StepDesign: React.FC<{
             )}
           </button>
           <p className="text-[10px] text-gray-400 mt-1 text-right">JPG, PNG, PDF</p>
+        </div>
         </div>
       </div>
 

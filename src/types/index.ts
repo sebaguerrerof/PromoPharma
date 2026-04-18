@@ -455,3 +455,48 @@ export interface MailingProject {
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
+
+// ── Brand Text Bank ──────────────────────────────────────
+
+export type TextBankEmailType = 'promocional' | 'informativo' | 'newsletter' | 'invitación' | 'científico' | 'aviso_breve' | 'otro';
+export type TextBankSource = 'manual' | 'ai' | 'ai_edited';
+
+export interface BrandTextBankEntry {
+  id: string;
+  brandId: string;
+  brandName: string;
+  tenantId: string;
+
+  emailType: TextBankEmailType;
+  tags: string[];
+  source: TextBankSource;
+
+  subject: string;
+  preheaderText?: string;
+
+  texts: {
+    titles: string[];
+    paragraphs: string[];
+    bulletPoints: string[];
+    ctaTexts: string[];
+    ctaLabels: string[];
+    heroTitles: string[];
+    heroSubtitles: string[];
+    quotes: string[];
+    footerText?: string;
+  };
+
+  blockSequence: string[];
+  templateIdUsed?: string;
+
+  aiContext?: {
+    userPrompt: string;
+    reasoning?: string;
+    tone?: string;
+    length?: string;
+  };
+
+  mailingProjectId: string;
+  createdBy: string;
+  createdAt: Timestamp;
+}

@@ -318,34 +318,34 @@ const HeaderBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }
         <Row>
           <Column style={{ verticalAlign: 'middle' }}>
             <div style={{ position: 'relative', left: logoX * 2, top: logoY * 2, display: 'inline-block' }}>
-              {logoSrc && (
+              {logoSrc ? (
                 <Img
                   src={logoSrc}
-                  alt="Logo"
+                  alt={block.content || 'Logo'}
                   height={42}
                   style={{
                     height: 42,
                     width: 'auto',
                     display: 'block',
-                    marginBottom: 16,
                   }}
                 />
+              ) : (
+                <Heading
+                  as="h1"
+                  style={{
+                    fontFamily: `'${block.style?.fontFamily || titleFont}', Arial, sans-serif`,
+                    fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) : 22,
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    margin: 0,
+                    letterSpacing: '-0.3px',
+                    textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || 'uppercase' as const,
+                    textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined,
+                  }}
+                >
+                  {block.content || ''}
+                </Heading>
               )}
-              <Heading
-                as="h1"
-                style={{
-                  fontFamily: `'${block.style?.fontFamily || titleFont}', Arial, sans-serif`,
-                  fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) : 22,
-                  fontWeight: 800,
-                  color: block.style?.color || '#ffffff',
-                  margin: 0,
-                  letterSpacing: '-0.3px',
-                  textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || 'uppercase' as const,
-                  textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined,
-                }}
-              >
-                {block.content || ''}
-              </Heading>
             </div>
           </Column>
           {block.style?.headerDate !== '__hide__' && (
