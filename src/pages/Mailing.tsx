@@ -28,7 +28,8 @@ const Mailing: React.FC = () => {
       setLoading(true);
       const data = await getMailingProjects(tenantId);
       setProjects(data);
-    } catch {
+    } catch (err) {
+      console.error('Error al cargar emails:', err);
       toast('Error al cargar emails', 'error');
     } finally {
       setLoading(false);
@@ -84,59 +85,85 @@ const Mailing: React.FC = () => {
           }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => {
-            const badge = STATUS_BADGE[p.status];
-            return (
-              <div
-                key={p.id}
-                className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer overflow-hidden"
-                onClick={() => navigate(`/mailing/${p.id}`)}
-              >
-                {/* Preview strip */}
-                <div
-                  className="h-3 w-full"
-                  style={{ background: `linear-gradient(90deg, ${p.style.colorPrimary}, ${p.style.colorSecondary})` }}
-                />
+        (() => {
+          // Agrupar proyectos por marca
+          const grouped = projects.reduce<Record<string, MailingProject[]>>((acc, p) => {
+            const key = p.brandName || 'Sin marca';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(p);
+            return acc;
+          }, {});
+          const brandNames = Object.keys(grouped).sort();
 
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-                        {p.name}
-                      </h3>
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{p.subject}</p>
+          return (
+            <div className="space-y-8">
+              {brandNames.map((brandName) => {
+                const brandProjects = grouped[brandName];
+                const firstProject = brandProjects[0];
+                return (
+                  <div key={brandName}>
+                    {/* Brand header */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <div
+                        className="w-3 h-3 rounded-full shrink-0"
+                        style={{ backgroundColor: firstProject.style.colorPrimary }}
+                      />
+                      <h2 className="text-lg font-semibold text-gray-800">{brandName}</h2>
+                      <span className="text-xs text-gray-400">{brandProjects.length} {brandProjects.length === 1 ? 'email' : 'emails'}</span>
                     </div>
-                    <span className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full ${badge.cls}`}>
-                      {badge.label}
-                    </span>
+                    {/* Project cards */}
+                    <div className="space-y-3 pl-6">
+                      {brandProjects.map((p) => {
+                        const badge = STATUS_BADGE[p.status];
+                        return (
+                          <div
+                            key={p.id}
+                            className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer overflow-hidden flex"
+                            onClick={() => navigate(`/mailing/${p.id}`)}
+                          >
+                            {/* Color accent */}
+                            <div
+                              className="w-1.5 shrink-0"
+                              style={{ background: `linear-gradient(180deg, ${p.style.colorPrimary}, ${p.style.colorSecondary})` }}
+                            />
+                            <div className="flex-1 p-4 flex items-center gap-4">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <h3 className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                                    {p.name}
+                                  </h3>
+                                  <span className={`shrink-0 text-[11px] font-medium px-2 py-0.5 rounded-full ${badge.cls}`}>
+                                    {badge.label}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-400 truncate mt-0.5">{p.subject}</p>
+                              </div>
+                              <span className="text-xs text-gray-400 shrink-0 hidden sm:block">{p.designTemplateName}</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/mailing/${p.id}`); }}
+                                  className="text-xs font-medium text-blue-600 hover:text-blue-800 transition"
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); }}
+                                  className="text-xs font-medium text-red-500 hover:text-red-700 transition"
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-
-                  <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>{p.brandName}</span>
-                    <span>{p.designTemplateName}</span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-50">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/mailing/${p.id}`); }}
-                      className="text-xs font-medium text-blue-600 hover:text-blue-800 transition"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(p); }}
-                      className="text-xs font-medium text-red-500 hover:text-red-700 transition ml-auto"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          );
+        })()
       )}
 
       <ConfirmDialog

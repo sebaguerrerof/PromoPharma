@@ -72,7 +72,51 @@ export async function createMailingProject(data: {
     blocks,
     layout: data.designTemplate.layout,
     style: data.style,
-    status: 'draft',
+    status: 'ready',
+    tenantId: data.tenantId,
+    createdBy: data.createdBy,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+// ── Create from AI-generated blocks (no design template) ──
+
+export async function createMailingProjectFromBlocks(data: {
+  name: string;
+  subject: string;
+  brandId: string;
+  brandName: string;
+  blocks: MailingBlockContent[];
+  style: MailingProject['style'];
+  emailSettings?: MailingProject['emailSettings'];
+  tenantId: string;
+  createdBy: string;
+}): Promise<string> {
+  const layout = {
+    width: data.emailSettings?.containerWidth ?? 600,
+    height: 800,
+    blocks: data.blocks.map((b) => ({
+      id: b.id,
+      type: b.type,
+      defaultContent: b.content,
+      style: b.style,
+    })),
+  };
+
+  const ref = await addDoc(collection(db, COLLECTION), {
+    name: data.name,
+    subject: data.subject,
+    brandId: data.brandId,
+    brandName: data.brandName,
+    designTemplateId: 'ai-generated',
+    designTemplateName: 'Generado con IA',
+    blocks: data.blocks,
+    layout,
+    style: data.style,
+    emailSettings: data.emailSettings ?? {},
+    status: 'ready',
     tenantId: data.tenantId,
     createdBy: data.createdBy,
     createdAt: serverTimestamp(),

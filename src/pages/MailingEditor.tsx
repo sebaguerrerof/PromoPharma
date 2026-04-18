@@ -31,6 +31,7 @@ import {
 import {
   getMailingProject,
   createMailingProject,
+  createMailingProjectFromBlocks,
   updateMailingBlocks,
   updateMailingProject,
   generateMailingHTML,
@@ -329,7 +330,7 @@ const MailingEditor: React.FC = () => {
     const emailType = aiEmailType ?? 'otro';
     const source = determineSource(isAIGenerated, originalAIBlocks, blocks);
     try {
-      await createTextBankEntry({
+      const entry: Parameters<typeof createTextBankEntry>[0] = {
         tenantId,
         brandId: selectedBrand.id,
         brandName: selectedBrand.name,
@@ -341,10 +342,11 @@ const MailingEditor: React.FC = () => {
         texts: extractTextsFromBlocks(blocks),
         blockSequence: blocks.map((b) => b.type),
         createdBy: user.uid,
-        aiContext: aiContext
-          ? { userPrompt: aiContext.userPrompt, tone: aiContext.tone, length: aiContext.length }
-          : undefined,
-      });
+      };
+      if (aiContext) {
+        entry.aiContext = { userPrompt: aiContext.userPrompt, tone: aiContext.tone, length: aiContext.length };
+      }
+      await createTextBankEntry(entry);
     } catch (err) {
       console.error('[TextBank] Error al guardar en brand text bank:', err);
     }
@@ -369,7 +371,7 @@ const MailingEditor: React.FC = () => {
       const cleanBlocks = sanitize(blocks) as MailingBlockContent[];
       if (isEditing && project) {
         await updateMailingBlocks(project.id, cleanBlocks);
-        await updateMailingProject(project.id, { name: projectName, subject });
+        await updateMailingProject(project.id, { name: projectName, subject, status: 'ready' });
         await saveToBrandTextBank(project.id);
         toast('Email guardado', 'success');
       } else if (selectedBrand && selectedDesign) {
@@ -380,6 +382,22 @@ const MailingEditor: React.FC = () => {
           brandName: selectedBrand.name,
           designTemplate: selectedDesign,
           style: computedStyle,
+          tenantId,
+          createdBy: user!.uid,
+        });
+        await saveToBrandTextBank(newId);
+        toast('Email creado', 'success');
+        navigate(`/mailing/${newId}`, { replace: true });
+      } else if (selectedBrand && !selectedDesign && blocks.length > 0) {
+        // AI-generated flow — no design template selected
+        const newId = await createMailingProjectFromBlocks({
+          name: projectName,
+          subject,
+          brandId: selectedBrand.id,
+          brandName: selectedBrand.name,
+          blocks: cleanBlocks,
+          style: computedStyle,
+          emailSettings,
           tenantId,
           createdBy: user!.uid,
         });
@@ -465,7 +483,7 @@ const MailingEditor: React.FC = () => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition disabled:opacity-50 cursor-pointer"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
@@ -768,12 +786,11 @@ const StepDesign: React.FC<{
               onClick={onOpenAI}
               className="px-4 py-2.5 bg-linear-to-r from-blue-600 to-cyan-600 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-cyan-700 transition flex items-center gap-2 shadow-md shadow-blue-500/20"
             >
-              <span className="text-base">✨</span>
+              <span className="text-sm leading-none">✨</span>
               Crear con AI
             </button>
           )}
           {/* Upload button */}
-          <div>
           <input
             ref={fileInputRef}
             type="file"
@@ -803,8 +820,6 @@ const StepDesign: React.FC<{
               </>
             )}
           </button>
-          <p className="text-[10px] text-gray-400 mt-1 text-right">JPG, PNG, PDF</p>
-        </div>
         </div>
       </div>
 

@@ -38,8 +38,10 @@ const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 export async function createTextBankEntry(
   entry: Omit<BrandTextBankEntry, 'id' | 'createdAt'>,
 ): Promise<string> {
+  // Strip undefined values recursively — Firestore rejects them
+  const clean = JSON.parse(JSON.stringify(entry));
   const ref = await addDoc(collection(db, COLLECTION), {
-    ...entry,
+    ...clean,
     createdAt: serverTimestamp(),
   });
   return ref.id;
