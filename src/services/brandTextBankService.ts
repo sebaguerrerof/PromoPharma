@@ -14,6 +14,7 @@ import {
   orderBy,
   limit as firestoreLimit,
   serverTimestamp,
+  type QueryFieldFilterConstraint,
 } from 'firebase/firestore';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { db } from '@/firebase/config';
@@ -52,18 +53,19 @@ export async function getBrandTextBank(
   tenantId: string,
   options?: { limit?: number; emailType?: TextBankEmailType },
 ): Promise<BrandTextBankEntry[]> {
-  const constraints = [
+  const constraints: QueryFieldFilterConstraint[] = [
     where('tenantId', '==', tenantId),
     where('brandId', '==', brandId),
-    orderBy('createdAt', 'desc'),
   ];
   if (options?.emailType) {
     constraints.push(where('emailType', '==', options.emailType));
   }
-  if (options?.limit) {
-    constraints.push(firestoreLimit(options.limit));
-  }
-  const q = query(collection(db, COLLECTION), ...constraints);
+  const q = query(
+    collection(db, COLLECTION),
+    ...constraints,
+    orderBy('createdAt', 'desc'),
+    ...(options?.limit ? [firestoreLimit(options.limit)] : []),
+  );
   try {
     const snap = await getDocs(q);
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BrandTextBankEntry);

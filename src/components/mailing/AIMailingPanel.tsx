@@ -126,7 +126,7 @@ const AIMailingPanel: React.FC<AIMailingPanelProps> = ({
 
       // 3. Callback to parent
       onGenerated(response, {
-        emailType,
+        emailType: emailType ?? 'promocional',
         userPrompt: prompt.trim(),
         tone: options.tone,
         length: options.length,
