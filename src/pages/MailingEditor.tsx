@@ -1223,15 +1223,20 @@ const StepEditor: React.FC<{
           </DndContext>
 
           {/* Add block button */}
-          <div className="p-2 pt-0 relative">
+          <div className="p-2 pt-0">
             <button
               onClick={() => setShowAddMenu(!showAddMenu)}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 border-dashed border-gray-200 text-[11px] font-semibold text-gray-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50/30 transition-all"
+              className={`w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border-2 border-dashed text-[11px] font-semibold transition-all ${
+                showAddMenu
+                  ? 'border-blue-300 text-blue-600 bg-blue-50/40'
+                  : 'border-gray-200 text-gray-400 hover:border-blue-300 hover:text-blue-500 hover:bg-blue-50/30'
+              }`}
             >
-              <span className="text-sm">+</span> Agregar bloque
+              <span className={`text-sm transition-transform ${showAddMenu ? 'rotate-45' : ''}`}>+</span>
+              {showAddMenu ? 'Cerrar' : 'Agregar bloque'}
             </button>
             {showAddMenu && (
-              <div className="absolute bottom-full left-2 right-2 mb-1 bg-white rounded-2xl border border-gray-200 shadow-xl z-50 p-3 max-h-72 overflow-y-auto">
+              <div className="mt-2 bg-gray-50 rounded-xl border border-gray-100 p-3">
                 <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Tipo de bloque</div>
                 <div className="grid grid-cols-2 gap-1.5">
                   {(Object.keys(BLOCK_LABELS) as DesignBlockType[]).map((type) => (
@@ -1241,7 +1246,7 @@ const StepEditor: React.FC<{
                         onAddBlock(type, activeBlockId ?? undefined);
                         setShowAddMenu(false);
                       }}
-                      className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-left hover:bg-blue-50 hover:text-blue-700 transition text-[11px] text-gray-600"
+                      className="flex items-center gap-2 px-2.5 py-2 rounded-lg text-left hover:bg-blue-50 hover:text-blue-700 transition text-[11px] text-gray-600 bg-white border border-gray-100 shadow-sm"
                     >
                       <span>{BLOCK_ICONS[type]}</span>
                       <span className="font-medium">{BLOCK_LABELS[type]}</span>
@@ -1487,7 +1492,9 @@ const DraggableLogo: React.FC<{
   offsetY: number;
   textStyle?: Record<string, string>;
   onDragEnd: (x: number, y: number) => void;
-}> = ({ logoUrl, text, titleFont, offsetX, offsetY, textStyle, onDragEnd }) => {
+  logoHeight?: number;
+  logoOpacity?: number;
+}> = ({ logoUrl, text, titleFont, offsetX, offsetY, textStyle, onDragEnd, logoHeight = 24, logoOpacity = 1 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ mx: 0, my: 0, ox: offsetX, oy: offsetY });
@@ -1542,7 +1549,7 @@ const DraggableLogo: React.FC<{
       title="Arrastra para reposicionar el logo"
     >
       {logoUrl && (
-        <img src={logoUrl} alt="" style={{ height: 24, width: 'auto', objectFit: 'contain', display: 'block', marginBottom: text ? 8 : 0, pointerEvents: 'none' }} />
+        <img src={logoUrl} alt="" style={{ height: logoHeight, width: 'auto', objectFit: 'contain', display: 'block', marginBottom: text ? 8 : 0, pointerEvents: 'none', opacity: logoOpacity }} />
       )}
       {text && (
         <span style={{
@@ -1611,9 +1618,9 @@ const EmailVisualPreview: React.FC<{
     return inner;
   };
 
-  const wrapPreview = (id: string, el: React.ReactNode, block: MailingBlockContent, skipBg = false) => {
+  const wrapPreview = (id: string, el: React.ReactNode, block: MailingBlockContent, skipBg = false, skipPad = false) => {
     const hasBg = !skipBg && (block.backgroundColor || block.backgroundImage);
-    const hasPad = block.paddingTop != null || block.paddingBottom != null || block.paddingLeft != null || block.paddingRight != null;
+    const hasPad = !skipPad && (block.paddingTop != null || block.paddingBottom != null || block.paddingLeft != null || block.paddingRight != null);
     const inner = (hasBg || hasPad) ? (
       <div
         style={{
@@ -1621,10 +1628,10 @@ const EmailVisualPreview: React.FC<{
           backgroundImage: !skipBg && block.backgroundImage ? `url(${block.backgroundImage})` : undefined,
           backgroundSize: !skipBg && block.backgroundImage ? 'cover' : undefined,
           backgroundPosition: !skipBg && block.backgroundImage ? 'center' : undefined,
-          paddingTop: block.paddingTop != null ? block.paddingTop * 0.5 : undefined,
-          paddingBottom: block.paddingBottom != null ? block.paddingBottom * 0.5 : undefined,
-          paddingLeft: block.paddingLeft != null ? block.paddingLeft * 0.5 : undefined,
-          paddingRight: block.paddingRight != null ? block.paddingRight * 0.5 : undefined,
+          paddingTop: !skipPad && block.paddingTop != null ? block.paddingTop * 0.5 : undefined,
+          paddingBottom: !skipPad && block.paddingBottom != null ? block.paddingBottom * 0.5 : undefined,
+          paddingLeft: !skipPad && block.paddingLeft != null ? block.paddingLeft * 0.5 : undefined,
+          paddingRight: !skipPad && block.paddingRight != null ? block.paddingRight * 0.5 : undefined,
         }}
       >
         {el}
@@ -1637,20 +1644,28 @@ const EmailVisualPreview: React.FC<{
     switch (block.type) {
       case 'header': {
         // Header manages its own background — backgroundColor and backgroundImage take priority over brand gradient
+        const hdrBgSize = block.style?.headerBgSize || 'cover';
+        const hdrBgPos = block.style?.headerBgPos || 'center';
         const headerStyle: React.CSSProperties = block.backgroundImage
-          ? { backgroundImage: `url(${block.backgroundImage})`, backgroundSize: 'cover', backgroundPosition: 'center', backgroundColor: block.backgroundColor || style.colorPrimary }
+          ? { backgroundImage: `url(${block.backgroundImage})`, backgroundSize: hdrBgSize, backgroundPosition: hdrBgPos, backgroundColor: block.backgroundColor || style.colorPrimary }
           : block.backgroundColor
             ? { backgroundColor: block.backgroundColor }
             : { background: `linear-gradient(135deg, ${style.colorPrimary}, ${style.colorSecondary})` };
         const logoX = parseFloat(block.style?.logoX || '0');
         const logoY = parseFloat(block.style?.logoY || '0');
+        const hdrLogoHeight = parseInt(block.style?.logoHeight || '24');
+        const hdrLogoOpacity = parseFloat(block.style?.logoOpacity || '1');
         const hasLogo = !!(block.imageUrl || style.logoUrl);
+        // Inner padding uses block padding fields (scaled 0.5x for preview), falling back to defaults
+        const iPadT = block.paddingTop != null ? block.paddingTop * 0.5 : 18;
+        const iPadB = block.paddingBottom != null ? block.paddingBottom * 0.5 : 16;
+        const iPadX = block.paddingLeft != null ? block.paddingLeft * 0.5 : 20;
         return wrapPreview(block.id,
           <div style={headerStyle}>
             {!block.backgroundImage && !block.backgroundColor && (
               <div style={{ height: 3, background: 'linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.25), rgba(255,255,255,0.1))' }} />
             )}
-            <div style={{ padding: '18px 20px 16px', position: 'relative', minHeight: 60, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'left' }}>
+            <div style={{ padding: `${iPadT}px ${iPadX}px ${iPadB}px`, position: 'relative', minHeight: 60, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'left' }}>
               {/* Logo + text as draggable sub-component */}
               <DraggableLogo
                 logoUrl={hasLogo ? (block.imageUrl || style.logoUrl) : undefined}
@@ -1659,18 +1674,20 @@ const EmailVisualPreview: React.FC<{
                 offsetX={logoX}
                 offsetY={logoY}
                 textStyle={block.style}
+                logoHeight={hdrLogoHeight}
+                logoOpacity={hdrLogoOpacity}
                 onDragEnd={(x, y) => {
                   onBlockChange?.(block.id, { style: { ...block.style, logoX: String(Math.round(x)), logoY: String(Math.round(y)) } });
                 }}
               />
               {block.style?.headerDate !== '__hide__' && (
-                <span style={{ position: 'absolute', right: 20, bottom: 16, color: 'rgba(255,255,255,.25)', fontSize: 7, fontFamily: `'${bodyFont}', sans-serif`, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
+                <span style={{ position: 'absolute', right: iPadX, bottom: iPadB, color: 'rgba(255,255,255,.25)', fontSize: 7, fontFamily: `'${bodyFont}', sans-serif`, letterSpacing: '1px', textTransform: 'uppercase' as const }}>
                   {block.style?.headerDate || new Date().toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}
                 </span>
               )}
             </div>
           </div>,
-        block, true);
+        block, true, true);
       }
       case 'hero': {
         const hFont = block.style?.fontFamily || titleFont;
@@ -1683,7 +1700,6 @@ const EmailVisualPreview: React.FC<{
         const hBorder = (!block.style?.imgBorder || block.style.imgBorder === 'none') ? undefined : block.style.imgBorder.includes('solid') && !block.style.imgBorder.includes('#') ? block.style.imgBorder.replace('solid', `solid ${block.style?.imgBorderColor || '#d1d5db'}`) : block.style.imgBorder;
         const heroTitle = block.style?.heroTitle || '';
         const heroSubtitle = block.style?.heroSubtitle || '';
-        const hasOverlay = !!(heroTitle || heroSubtitle);
         return wrapPreview(block.id,
           block.imageUrl ? (
             <div style={{ position: 'relative', overflow: 'hidden' }}>
@@ -1697,26 +1713,25 @@ const EmailVisualPreview: React.FC<{
                 boxShadow: heroShadowMap[hShadow] || 'none',
                 border: hBorder,
               }} />
-              {hasOverlay && (
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)',
+                display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                padding: '20px 24px', textAlign: hAlign,
+                borderRadius: `${block.style?.imgBorderRadius || '0'}px`,
+              }}>
                 <div style={{
-                  position: 'absolute', inset: 0,
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)',
-                  display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-                  padding: '20px 24px', textAlign: hAlign,
-                  borderRadius: `${block.style?.imgBorderRadius || '0'}px`,
-                }}>
-                  {heroTitle && (
-                    <div style={{
-                      fontFamily: `'${hFont}', sans-serif`, fontWeight: 900, fontSize: hSize,
-                      color: hColor, letterSpacing: '-0.5px', lineHeight: 1.15,
-                      textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
-                    }}>{heroTitle}</div>
-                  )}
-                  {heroSubtitle && (
-                    <div style={{ fontFamily: `'${hFont}', sans-serif`, fontSize: Math.max(hSize * 0.55, 7), color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>{heroSubtitle}</div>
-                  )}
-                </div>
-              )}
+                  fontFamily: `'${hFont}', sans-serif`, fontWeight: 900, fontSize: hSize,
+                  color: hColor, letterSpacing: '-0.5px', lineHeight: 1.15,
+                  textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+                  opacity: heroTitle ? 1 : 0.35,
+                }}>{heroTitle || 'Título del hero'}</div>
+                {(heroSubtitle || !heroTitle) && (
+                  <div style={{ fontFamily: `'${hFont}', sans-serif`, fontSize: Math.max(hSize * 0.55, 7), color: 'rgba(255,255,255,0.7)', marginTop: 4, opacity: heroSubtitle ? 1 : 0.35 }}>
+                    {heroSubtitle || 'Subtítulo opcional'}
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <div style={{ background: `linear-gradient(165deg, ${darkenHex(style.colorPrimary, 0.7)}, ${darkenHex(style.colorPrimary, 0.45)}, ${darkenHex(style.colorSecondary, 0.5)})`, padding: '40px 24px 36px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
@@ -1843,8 +1858,14 @@ const EmailVisualPreview: React.FC<{
         const ctaFontSize = block.style?.fontSize ? Math.round(parseInt(block.style.fontSize) * 0.65) : 10;
         const ctaAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center';
         const ctaFont = block.style?.fontFamily || titleFont;
+        const hasCustomBg = !!(block.backgroundImage || block.backgroundColor);
         return wrapPreview(block.id,
-          <div style={{ background: `linear-gradient(135deg, ${bandColor}, ${darkenHex(bandColor, 0.15)})`, padding: '20px 24px', textAlign: ctaAlign }}>
+          <div style={{
+            ...(hasCustomBg
+              ? {}
+              : { background: `linear-gradient(135deg, ${bandColor}, ${darkenHex(bandColor, 0.15)})` }),
+            padding: '20px 24px', textAlign: ctaAlign
+          }}>
             {block.content && (
               <div style={{ fontSize: block.style?.fontSize ? Math.round(parseInt(block.style.fontSize) * 0.5) : 8, color: block.style?.color || 'rgba(255,255,255,0.6)', letterSpacing: '1.5px', textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || 'uppercase', fontWeight: 600, marginBottom: 10, fontFamily: `'${ctaFont}', sans-serif` }}>{block.content}</div>
             )}
@@ -1899,12 +1920,34 @@ const EmailVisualPreview: React.FC<{
           email: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg>`,
         };
         const qrUrl = block.style?.footerQrUrl;
+        const qrImageUrl = block.style?.footerQrImageUrl;
         const companyInfo = block.style?.footerCompanyInfo;
+        const footerBgColor = block.backgroundColor || '#111117';
+        const footerLogoUrl = block.imageUrl || style.logoUrl;
+        const footerLogoHeight = parseInt(block.style?.footerLogoHeight || '16');
+        const footerLogoOpacity = parseFloat(block.style?.footerLogoOpacity || '0.5');
+        const fLogoX = parseFloat(block.style?.logoX || '0');
+        const fLogoY = parseFloat(block.style?.logoY || '0');
         return wrapPreview(block.id,
           <div>
             <div style={{ height: 2, background: `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary}, ${style.colorPrimary})` }} />
-            <div style={{ backgroundColor: '#111117', padding: '18px 20px 16px', textAlign: 'center' }}>
-              {style.logoUrl && (<img src={style.logoUrl} alt="" style={{ height: 16, margin: '0 auto 10px', display: 'block', opacity: 0.5 }} />)}
+            <div style={{ backgroundColor: footerBgColor, padding: '18px 20px 16px', textAlign: 'center' }}>
+              {footerLogoUrl && (
+                <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'center' }}>
+                  <DraggableLogo
+                    logoUrl={footerLogoUrl}
+                    text=""
+                    titleFont={titleFont}
+                    offsetX={fLogoX}
+                    offsetY={fLogoY}
+                    logoHeight={footerLogoHeight}
+                    logoOpacity={footerLogoOpacity}
+                    onDragEnd={(x, y) => {
+                      onBlockChange?.(block.id, { style: { ...block.style, logoX: String(Math.round(x)), logoY: String(Math.round(y)) } });
+                    }}
+                  />
+                </div>
+              )}
               {fLinks.length > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   {fLinks.map(({ platform }, idx) => (
@@ -1916,10 +1959,14 @@ const EmailVisualPreview: React.FC<{
                 </div>
               )}
               <div style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginBottom: 10 }} />
-              {qrUrl && (
+              {(qrImageUrl || qrUrl) && (
                 <div style={{ marginBottom: 10 }}>
-                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrUrl)}&bgcolor=111117&color=ffffff`} alt="QR" style={{ width: 50, height: 50, display: 'block', margin: '0 auto 4px', opacity: 0.6 }} />
-                  <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.5px' }}>Escanea para más info</div>
+                  <img
+                    src={qrImageUrl || `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrUrl!)}&bgcolor=111117&color=ffffff`}
+                    alt="QR"
+                    style={{ width: 50, height: 50, display: 'block', margin: '0 auto 4px', opacity: 0.6 }}
+                  />
+                  <div style={{ fontSize: 6, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.5px' }}>{block.style?.footerQrLabel || 'Escanea para más info'}</div>
                 </div>
               )}
               <div style={{ fontFamily: `'${fFont}', sans-serif`, fontSize: fSize, color: fColor, lineHeight: 1.7, fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center', textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>
@@ -1939,7 +1986,7 @@ const EmailVisualPreview: React.FC<{
               </div>
             </div>
           </div>,
-        block);
+        block, true);
       }
       case 'quote': {
         const qIcon = block.style?.quoteIcon || '❝';
@@ -2076,15 +2123,26 @@ const EmailVisualPreview: React.FC<{
       case 'columns': {
         const cols = (block.content || '').split('|||').map((c) => c.trim());
         const colFont = block.style?.fontFamily || bodyFont;
+        const colAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined;
+        const colStyle: React.CSSProperties = {
+          flex: 1,
+          fontFamily: `'${colFont}', sans-serif`,
+          fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) * 0.65 : 10,
+          color: block.style?.color || '#4a4a4a',
+          lineHeight: 1.7,
+          textAlign: colAlign,
+          fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400,
+          textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined,
+        };
+        const renderColLines = (text: string, placeholder: string) =>
+          (text || placeholder).split('\n').map((l, i) => (
+            <div key={i} style={{ textAlign: colAlign }}>{l || '\u00a0'}</div>
+          ));
         return wrapPreview(block.id,
-          <div style={{ padding: '10px 24px', display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, fontFamily: `'${colFont}', sans-serif`, fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) * 0.65 : 10, color: block.style?.color || '#4a4a4a', lineHeight: 1.7, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined, fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400, textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>
-              {(cols[0] || 'Columna izquierda').split('\n').map((l, i) => (<span key={i}>{l}{i < (cols[0] || '').split('\n').length - 1 && <br />}</span>))}
-            </div>
+          <div style={{ padding: '10px 24px', display: 'flex', gap: 8, alignItems: 'stretch' }}>
+            <div style={colStyle}>{renderColLines(cols[0] || '', 'Columna izquierda')}</div>
             <div style={{ width: 2, backgroundColor: lightenHex(style.colorPrimary, 0.7), flexShrink: 0 }} />
-            <div style={{ flex: 1, fontFamily: `'${colFont}', sans-serif`, fontSize: block.style?.fontSize ? parseInt(block.style.fontSize) * 0.65 : 10, color: block.style?.color || '#4a4a4a', lineHeight: 1.7, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined, fontWeight: block.style?.fontWeight === 'bold' ? 700 : 400, textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || undefined }}>
-              {(cols[1] || 'Columna derecha').split('\n').map((l, i) => (<span key={i}>{l}{i < (cols[1] || '').split('\n').length - 1 && <br />}</span>))}
-            </div>
+            <div style={colStyle}>{renderColLines(cols[1] || '', 'Columna derecha')}</div>
           </div>,
         block);
       }
@@ -2256,6 +2314,113 @@ const BlockEditor: React.FC<{
       </div>
 
       <div className="p-5 space-y-4">
+        {/* ── HEADER: Logo (shown first, before text/font controls) ── */}
+        {block.type === 'header' && (
+          <div className="space-y-3">
+            <label className="block text-[11px] font-semibold text-gray-500">Logo del encabezado</label>
+
+            {/* Current logo preview */}
+            {(block.imageUrl || style.logoUrl) && (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-gray-900 rounded-xl p-2 flex items-center justify-center min-h-[48px]">
+                  <img
+                    src={block.imageUrl || style.logoUrl}
+                    alt="Logo"
+                    style={{ height: Math.max(parseInt(block.style?.logoHeight || '24') * 1.5, 24), width: 'auto', maxWidth: '100%', objectFit: 'contain', opacity: parseFloat(block.style?.logoOpacity || '1') }}
+                  />
+                </div>
+                {block.imageUrl && (
+                  <button onClick={() => onChange({ imageUrl: '' })} className="text-[10px] text-red-500 hover:text-red-700 font-medium transition flex-shrink-0">Quitar</button>
+                )}
+              </div>
+            )}
+
+            {/* Brand logos grid */}
+            {(() => {
+              const allLogos: { label: string; url: string }[] = [];
+              if (brand?.params.logoUrl) allLogos.push({ label: 'Logo principal', url: brand.params.logoUrl });
+              if (brand?.params.logos?.length) allLogos.push(...brand.params.logos);
+              if (allLogos.length === 0) return null;
+              return (
+                <div>
+                  <span className="text-[10px] text-gray-400 mb-1.5 block">Logos de la marca</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {allLogos.map((logo, idx) => {
+                      const isSelected = block.imageUrl === logo.url || (!block.imageUrl && logo.url === style.logoUrl);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => onChange({ imageUrl: logo.url })}
+                          className={`rounded-lg border p-1.5 flex flex-col items-center gap-1 transition-all ${
+                            isSelected ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500/30' : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <img src={logo.url} alt={logo.label} className="h-8 w-auto max-w-full object-contain" />
+                          <span className={`text-[9px] leading-tight text-center truncate w-full ${isSelected ? 'text-blue-700 font-semibold' : 'text-gray-500'}`}>{logo.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Upload custom logo */}
+            <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+            <button onClick={() => imgInputRef.current?.click()} className="text-[11px] text-blue-600 hover:text-blue-800 font-medium transition flex items-center gap-1">
+              <span>📤</span> Subir otro logo
+            </button>
+
+            {/* Logo size + opacity */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+              <div>
+                <label className="block text-[10px] text-gray-400 mb-1">Tamaño del logo</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="range" min="12" max="120" step="2"
+                    value={parseInt(block.style?.logoHeight || '24')}
+                    onChange={(e) => onChange({ style: { ...block.style, logoHeight: e.target.value } })}
+                    className="flex-1 h-1.5 accent-blue-500"
+                  />
+                  <span className="text-[11px] font-mono text-gray-500 w-9 text-right">{block.style?.logoHeight || '24'}px</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-400 mb-1">Opacidad</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="range" min="0.1" max="1" step="0.05"
+                    value={parseFloat(block.style?.logoOpacity || '1')}
+                    onChange={(e) => onChange({ style: { ...block.style, logoOpacity: e.target.value } })}
+                    className="flex-1 h-1.5 accent-blue-500"
+                  />
+                  <span className="text-[11px] font-mono text-gray-500 w-9 text-right">{Math.round(parseFloat(block.style?.logoOpacity || '1') * 100)}%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Logo position */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="block text-[10px] text-gray-400 mb-1">Posición <span className="text-gray-300">(arrastra en el preview)</span></label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-400 w-3">X</span>
+                  <input type="number" value={parseInt(block.style?.logoX || '0')} onChange={(e) => onChange({ style: { ...block.style, logoX: e.target.value || '0' } })} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400" />
+                  <span className="text-[10px] text-gray-300">px</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-400 w-3">Y</span>
+                  <input type="number" value={parseInt(block.style?.logoY || '0')} onChange={(e) => onChange({ style: { ...block.style, logoY: e.target.value || '0' } })} className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400" />
+                  <span className="text-[10px] text-gray-300">px</span>
+                </div>
+              </div>
+              {((block.style?.logoX && block.style.logoX !== '0') || (block.style?.logoY && block.style.logoY !== '0')) && (
+                <button onClick={() => onChange({ style: { ...block.style, logoX: '0', logoY: '0' } })} className="text-[10px] text-gray-400 hover:text-red-500 mt-1 transition">↩ Restablecer posición</button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Content textarea (text, bullets, header, footer) ── */}
         {(block.type === 'text' || block.type === 'bullets' || block.type === 'header' || block.type === 'footer') && (
           <div>
@@ -2291,6 +2456,157 @@ const BlockEditor: React.FC<{
         {/* ── Footer specific controls ── */}
         {block.type === 'footer' && (
           <>
+            {/* Logo del pie de página */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Logo del pie de página</label>
+              {(block.imageUrl || style.logoUrl) && (
+                <div className="flex items-center gap-2 mb-2">
+                  <img
+                    src={block.imageUrl || style.logoUrl}
+                    alt="Logo"
+                    className="h-8 w-auto object-contain rounded-lg border border-gray-100 bg-gray-800 p-1"
+                  />
+                  {block.imageUrl && (
+                    <button
+                      onClick={() => onChange({ imageUrl: '' })}
+                      className="text-[10px] text-red-500 hover:text-red-700 font-medium transition"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
+              )}
+              {/* Brand logos grid */}
+              {(() => {
+                const allLogos: { label: string; url: string }[] = [];
+                if (brand?.params.logoUrl) allLogos.push({ label: 'Logo principal', url: brand.params.logoUrl });
+                if (brand?.params.logos?.length) allLogos.push(...brand.params.logos);
+                if (allLogos.length === 0) return null;
+                return (
+                  <div className="mb-2">
+                    <span className="text-[10px] text-gray-400 mb-1.5 block">Logos de la marca</span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {allLogos.map((logo, idx) => {
+                        const isSelected = block.imageUrl === logo.url || (!block.imageUrl && logo.url === style.logoUrl);
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => onChange({ imageUrl: logo.url })}
+                            className={`rounded-lg border p-1.5 flex flex-col items-center gap-1 transition-all ${
+                              isSelected
+                                ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500/30'
+                                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            <img src={logo.url} alt={logo.label} className="h-8 w-auto max-w-full object-contain" />
+                            <span className={`text-[9px] leading-tight text-center truncate w-full ${isSelected ? 'text-blue-700 font-semibold' : 'text-gray-500'}`}>
+                              {logo.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+              <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              <button
+                onClick={() => imgInputRef.current?.click()}
+                className="text-[11px] text-blue-600 hover:text-blue-800 font-medium transition flex items-center gap-1"
+              >
+                <span>📤</span> Subir otro logo
+              </button>
+              {/* Logo size + opacity */}
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-0.5">Tamaño (alto)</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={parseInt(block.style?.footerLogoHeight || '16')}
+                      onChange={(e) => onChange({ style: { ...block.style, footerLogoHeight: e.target.value || '16' } })}
+                      className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+                    />
+                    <span className="text-[10px] text-gray-400">px</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-0.5">Opacidad</label>
+                  <input
+                    type="range"
+                    min="0" max="1" step="0.05"
+                    value={parseFloat(block.style?.footerLogoOpacity || '0.5')}
+                    onChange={(e) => onChange({ style: { ...block.style, footerLogoOpacity: e.target.value } })}
+                    className="w-full mt-1"
+                  />
+                  <span className="text-[9px] text-gray-400">{Math.round(parseFloat(block.style?.footerLogoOpacity || '0.5') * 100)}%</span>
+                </div>
+              </div>
+              {/* Logo position X/Y */}
+              <div className="mt-2">
+                <label className="block text-[10px] text-gray-400 mb-1">Posición <span className="text-gray-300">(arrastra en el preview)</span></label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-gray-400 mb-0.5">X</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={parseInt(block.style?.logoX || '0')}
+                        onChange={(e) => onChange({ style: { ...block.style, logoX: e.target.value || '0' } })}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+                      />
+                      <span className="text-[10px] text-gray-400">px</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-400 mb-0.5">Y</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={parseInt(block.style?.logoY || '0')}
+                        onChange={(e) => onChange({ style: { ...block.style, logoY: e.target.value || '0' } })}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400"
+                      />
+                      <span className="text-[10px] text-gray-400">px</span>
+                    </div>
+                  </div>
+                </div>
+                {((block.style?.logoX && block.style?.logoX !== '0') || (block.style?.logoY && block.style?.logoY !== '0')) && (
+                  <button
+                    onClick={() => onChange({ style: { ...block.style, logoX: '0', logoY: '0' } })}
+                    className="text-[10px] text-gray-400 hover:text-red-500 mt-1 transition"
+                  >
+                    ↩ Restablecer posición
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Fondo del footer */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Color de fondo</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={block.backgroundColor || '#111117'}
+                  onChange={(e) => onChange({ backgroundColor: e.target.value })}
+                  className="w-7 h-7 rounded-lg border border-gray-200 cursor-pointer"
+                />
+                <input
+                  value={block.backgroundColor || ''}
+                  onChange={(e) => onChange({ backgroundColor: e.target.value })}
+                  placeholder="#111117 (negro por defecto)"
+                  className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] focus:outline-none focus:border-blue-400"
+                />
+                {block.backgroundColor && (
+                  <button
+                    onClick={() => onChange({ backgroundColor: undefined })}
+                    className="text-[10px] text-gray-400 hover:text-red-500"
+                  >✕</button>
+                )}
+              </div>
+            </div>
+
             {/* Social links for footer */}
             <div className="pt-2 border-t border-gray-100">
               <label className="block text-[11px] font-semibold text-gray-500 mb-2">Redes sociales del footer</label>
@@ -2373,21 +2689,88 @@ const BlockEditor: React.FC<{
             {/* QR Code */}
             <div className="pt-2 border-t border-gray-100">
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Código QR <span className="font-normal text-gray-400">(opcional)</span></label>
-              <input
-                value={block.style?.footerQrUrl || ''}
-                onChange={(e) => onChange({ style: { ...block.style, footerQrUrl: e.target.value } })}
-                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
-                placeholder="https://link-del-producto.com"
-              />
-              <p className="text-[10px] text-gray-400 mt-1">Se generará un QR automáticamente con este URL</p>
-              {block.style?.footerQrUrl && (
-                <div className="mt-2 flex items-center gap-3">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(block.style.footerQrUrl)}&bgcolor=111117&color=ffffff`}
-                    alt="QR Preview"
-                    className="w-16 h-16 rounded-lg border border-gray-200"
+              {/* Mode toggle */}
+              <div className="flex gap-1 mb-2">
+                {(['url', 'imagen'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => onChange({ style: { ...block.style, footerQrMode: mode } })}
+                    className={`flex-1 py-1 text-[10px] font-semibold rounded-lg border transition ${
+                      (block.style?.footerQrMode || 'url') === mode
+                        ? 'bg-blue-50 border-blue-300 text-blue-700'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    {mode === 'url' ? '🔗 Desde URL' : '🖼️ Desde imagen'}
+                  </button>
+                ))}
+              </div>
+              {(block.style?.footerQrMode || 'url') === 'url' ? (
+                <>
+                  <input
+                    value={block.style?.footerQrUrl || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, footerQrUrl: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="https://link-del-producto.com"
                   />
-                  <div>
+                  <p className="text-[10px] text-gray-400 mt-1">Se generará un QR automáticamente con este URL</p>
+                  {block.style?.footerQrUrl && (
+                    <div className="mt-2 flex items-center gap-3">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(block.style.footerQrUrl)}&bgcolor=111117&color=ffffff`}
+                        alt="QR Preview"
+                        className="w-16 h-16 rounded-lg border border-gray-200"
+                      />
+                      <div>
+                        <input
+                          value={block.style?.footerQrLabel || ''}
+                          onChange={(e) => onChange({ style: { ...block.style, footerQrLabel: e.target.value } })}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
+                          placeholder="Etiqueta QR (ej: Escanea para más info)"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {block.style?.footerQrImageUrl ? (
+                    <div className="relative group mb-2">
+                      <img src={block.style.footerQrImageUrl} alt="QR" className="w-20 h-20 object-contain rounded-lg border border-gray-200 bg-gray-50" />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-lg flex items-center justify-center">
+                        <button
+                          onClick={() => { const s = { ...block.style }; delete s.footerQrImageUrl; onChange({ style: s }); }}
+                          className="px-2 py-1 bg-red-500 text-white text-[10px] font-semibold rounded-md shadow"
+                        >Quitar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-blue-300 hover:bg-blue-50/30 transition mb-2"
+                      onClick={() => (document.getElementById('footer-qr-upload') as HTMLInputElement)?.click()}
+                    >
+                      <span className="text-2xl">🔲</span>
+                      <span className="text-[10px] text-gray-400">Haz clic para subir imagen QR</span>
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="footer-qr-upload"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const ext = file.name.split('.').pop() ?? 'png';
+                        const path = `mailing/${tenantId}/qr_${Date.now()}.${ext}`;
+                        const url = await uploadFile(file, path);
+                        onChange({ style: { ...block.style, footerQrImageUrl: url } });
+                      } catch { /* ignore */ }
+                      e.target.value = '';
+                    }}
+                  />
+                  <div className="mt-1">
                     <input
                       value={block.style?.footerQrLabel || ''}
                       onChange={(e) => onChange({ style: { ...block.style, footerQrLabel: e.target.value } })}
@@ -2395,7 +2778,7 @@ const BlockEditor: React.FC<{
                       placeholder="Etiqueta QR (ej: Escanea para más info)"
                     />
                   </div>
-                </div>
+                </>
               )}
             </div>
 
@@ -2565,6 +2948,7 @@ const BlockEditor: React.FC<{
               />
             </div>
 
+            {block.type !== 'hero' && (
             <div>
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Leyenda / Texto alt</label>
               <input
@@ -2574,6 +2958,7 @@ const BlockEditor: React.FC<{
                 placeholder="Leyenda debajo de la imagen"
               />
             </div>
+            )}
 
             {/* ── Image display controls ── */}
             {block.imageUrl && (
@@ -2816,82 +3201,16 @@ const BlockEditor: React.FC<{
           </>
         )}
 
-        {/* ── Logo override for header ── */}
+        {/* ── Header: Background image + Date (logo is shown at top) ── */}
         {block.type === 'header' && (
-          <div>
-            <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">
-              Logo del encabezado
-            </label>
-
-            {/* Current logo preview */}
-            {(block.imageUrl || style.logoUrl) && (
-              <div className="flex items-center gap-2 mb-2">
-                <img
-                  src={block.imageUrl || style.logoUrl}
-                  alt="Logo"
-                  className="h-10 w-auto object-contain rounded-lg border border-gray-100 bg-white p-1"
-                />
-                {block.imageUrl && (
-                  <button
-                    onClick={() => onChange({ imageUrl: '' })}
-                    className="text-[10px] text-red-500 hover:text-red-700 font-medium transition"
-                  >
-                    Quitar
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Brand logos grid */}
-            {(() => {
-              const allLogos: { label: string; url: string }[] = [];
-              if (brand?.params.logoUrl) allLogos.push({ label: 'Logo principal', url: brand.params.logoUrl });
-              if (brand?.params.logos?.length) allLogos.push(...brand.params.logos);
-              if (allLogos.length === 0) return null;
-              return (
-                <div className="mb-2">
-                  <span className="text-[10px] text-gray-400 mb-1.5 block">Logos de la marca</span>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {allLogos.map((logo, idx) => {
-                      const isSelected = block.imageUrl === logo.url || (!block.imageUrl && logo.url === style.logoUrl);
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() => onChange({ imageUrl: logo.url })}
-                          className={`rounded-lg border p-1.5 flex flex-col items-center gap-1 transition-all ${
-                            isSelected
-                              ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500/30'
-                              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          <img src={logo.url} alt={logo.label} className="h-8 w-auto max-w-full object-contain" />
-                          <span className={`text-[9px] leading-tight text-center truncate w-full ${isSelected ? 'text-blue-700 font-semibold' : 'text-gray-500'}`}>
-                            {logo.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Upload custom logo */}
-            <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-            <button
-              onClick={() => imgInputRef.current?.click()}
-              className="text-[11px] text-blue-600 hover:text-blue-800 font-medium transition flex items-center gap-1"
-            >
-              <span>📤</span> Subir otro logo
-            </button>
-
-            {/* Header background image */}
-            <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="space-y-3">
+            {/* Header background */}
+            <div className="pt-2 border-t border-gray-100">
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Imagen de fondo</label>
               {block.backgroundImage ? (
-                <div className="relative group mb-1.5">
-                  <img src={block.backgroundImage} alt="" className="w-full h-20 object-cover rounded-lg border border-gray-100" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-lg flex items-center justify-center">
+                <div className="relative group mb-2">
+                  <img src={block.backgroundImage} alt="" className="w-full h-24 object-cover rounded-xl border border-gray-100" style={{ objectPosition: block.style?.headerBgPos || 'center' }} />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition rounded-xl flex items-center justify-center">
                     <button onClick={() => onChange({ backgroundImage: undefined })} className="px-2.5 py-1 bg-red-500 text-white text-[10px] font-semibold rounded-md shadow">Quitar</button>
                   </div>
                 </div>
@@ -2900,78 +3219,60 @@ const BlockEditor: React.FC<{
                   value=""
                   onChange={(e) => onChange({ backgroundImage: e.target.value })}
                   placeholder="URL de imagen..."
-                  className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-[11px] focus:outline-none focus:border-blue-400 mb-1"
+                  className="w-full px-3 py-1.5 rounded-lg border border-gray-200 text-[11px] focus:outline-none focus:border-blue-400 mb-1.5"
                 />
               )}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                id="header-bg-upload"
+              <input type="file" accept="image/*" className="hidden" id="header-bg-upload"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   try {
                     const ext = file.name.split('.').pop() ?? 'png';
-                    const path = `mailing/${tenantId}/${Date.now()}_bg.${ext}`;
-                    const url = await uploadFile(file, path);
+                    const url = await uploadFile(file, `mailing/${tenantId}/${Date.now()}_bg.${ext}`);
                     onChange({ backgroundImage: url });
                   } catch { /* ignore */ }
                   e.target.value = '';
                 }}
               />
-              <button
-                onClick={() => (document.getElementById('header-bg-upload') as HTMLInputElement)?.click()}
-                className="text-[11px] text-blue-600 hover:text-blue-800 font-medium transition flex items-center gap-1"
-              >
+              <button onClick={() => (document.getElementById('header-bg-upload') as HTMLInputElement)?.click()} className="text-[11px] text-blue-600 hover:text-blue-800 font-medium transition flex items-center gap-1 mb-2">
                 <span>🖼️</span> Subir imagen de fondo
               </button>
-            </div>
 
-            {/* Logo position (drag & drop) */}
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">
-                Posición del logo
-                <span className="font-normal text-gray-400 ml-1">(arrastra en el preview)</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] text-gray-400 mb-0.5">X (horizontal)</label>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      value={parseInt(block.style?.logoX || '0')}
-                      onChange={(e) => onChange({ style: { ...block.style, logoX: e.target.value || '0' } })}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400"
-                    />
-                    <span className="text-[10px] text-gray-400">px</span>
+              {/* Background size + position */}
+              {block.backgroundImage && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-[10px] text-gray-400 mb-1">Ajuste de imagen</label>
+                    <div className="flex gap-1">
+                      {([['cover', '⬛ Recortar'], ['contain', '↔ Completa'], ['auto', '↕ Original']] as const).map(([val, label]) => (
+                        <button key={val}
+                          onClick={() => onChange({ style: { ...block.style, headerBgSize: val } })}
+                          className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${
+                            (block.style?.headerBgSize || 'cover') === val ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-400 mb-1">Posición de imagen</label>
+                    <div className="flex gap-1">
+                      {([['top', '▲ Arriba'], ['center', '■ Centro'], ['bottom', '▼ Abajo']] as const).map(([val, label]) => (
+                        <button key={val}
+                          onClick={() => onChange({ style: { ...block.style, headerBgPos: val } })}
+                          className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${
+                            (block.style?.headerBgPos || 'center') === val ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >{label}</button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] text-gray-400 mb-0.5">Y (vertical)</label>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      value={parseInt(block.style?.logoY || '0')}
-                      onChange={(e) => onChange({ style: { ...block.style, logoY: e.target.value || '0' } })}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-mono focus:outline-none focus:border-blue-400"
-                    />
-                    <span className="text-[10px] text-gray-400">px</span>
-                  </div>
-                </div>
-              </div>
-              {(block.style?.logoX !== '0' && block.style?.logoX) || (block.style?.logoY !== '0' && block.style?.logoY) ? (
-                <button
-                  onClick={() => onChange({ style: { ...block.style, logoX: '0', logoY: '0' } })}
-                  className="text-[10px] text-gray-400 hover:text-red-500 mt-1.5 transition"
-                >
-                  ↩ Restablecer posición
-                </button>
-              ) : null}
+              )}
             </div>
 
             {/* Header date text */}
-            <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="pt-2 border-t border-gray-100">
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Texto de fecha</label>
               <div className="flex items-center gap-2">
                 <input
@@ -2984,15 +3285,11 @@ const BlockEditor: React.FC<{
               </div>
               <div className="flex items-center gap-3 mt-1.5">
                 <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <input type="checkbox"
                     checked={block.style?.headerDate !== '__hide__'}
                     onChange={(e) => {
-                      if (e.target.checked) {
-                        const s = { ...block.style }; delete s.headerDate; onChange({ style: s });
-                      } else {
-                        onChange({ style: { ...block.style, headerDate: '__hide__' } });
-                      }
+                      if (e.target.checked) { const s = { ...block.style }; delete s.headerDate; onChange({ style: s }); }
+                      else { onChange({ style: { ...block.style, headerDate: '__hide__' } }); }
                     }}
                     className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
@@ -3467,7 +3764,7 @@ const BlockEditor: React.FC<{
             </div>
             <div className="space-y-3">
               {/* Font family (for CTA and all blocks) */}
-              {['cta', 'text', 'header', 'footer', 'hero', 'quote', 'columns'].includes(block.type) && (
+              {['cta', 'text', 'header', 'footer', 'hero', 'quote', 'columns', 'bullets'].includes(block.type) && (
                 <div>
                   <label className="block text-[10px] text-gray-400 mb-1">Fuente</label>
                   <select
@@ -3768,7 +4065,7 @@ const BlockEditor: React.FC<{
         )}
 
         {/* ── Per-block background settings ── */}
-        {!['spacer', 'divider'].includes(block.type) && (
+        {!['spacer', 'divider', 'footer'].includes(block.type) && (
           <div className="pt-3 border-t border-gray-100">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Fondo del bloque</span>

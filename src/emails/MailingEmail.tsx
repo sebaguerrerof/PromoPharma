@@ -214,6 +214,20 @@ export default MailingEmail;
 const bPad = (b: MailingBlockContent, t: number, r: number, bot: number, l: number) =>
   `${b.paddingTop ?? t}px ${b.paddingRight ?? r}px ${b.paddingBottom ?? bot}px ${b.paddingLeft ?? l}px`;
 
+// Returns background styles from block-level settings (backgroundColor / backgroundImage).
+// Spread onto each block's root <Section> so bg and padding live on the same element.
+const getBlockBg = (b: MailingBlockContent): React.CSSProperties => {
+  if (!b.backgroundColor && !b.backgroundImage) return {};
+  const bg: React.CSSProperties = {};
+  if (b.backgroundColor) bg.backgroundColor = b.backgroundColor;
+  if (b.backgroundImage) {
+    bg.backgroundImage = `url(${b.backgroundImage})`;
+    bg.backgroundSize = 'cover';
+    bg.backgroundPosition = 'center';
+  }
+  return bg;
+};
+
 // ── Block Renderer ───────────────────────────────────────
 
 const BlockRenderer: React.FC<{
@@ -226,23 +240,9 @@ const BlockRenderer: React.FC<{
 }> = ({ block, blockIndex, totalBlocks, style, titleFont, bodyFont }) => {
   const common = { block, blockIndex, totalBlocks, style, titleFont, bodyFont };
 
-  const wrapBg = (el: React.ReactElement) => {
-    if (block.backgroundColor || block.backgroundImage) {
-      return (
-        <Section
-          style={{
-            backgroundColor: block.backgroundColor || undefined,
-            backgroundImage: block.backgroundImage ? `url(${block.backgroundImage})` : undefined,
-            backgroundSize: block.backgroundImage ? 'cover' : undefined,
-            backgroundPosition: block.backgroundImage ? 'center' : undefined,
-          }}
-        >
-          {el}
-        </Section>
-      );
-    }
-    return el;
-  };
+  // Background is now applied inside each block component via getBlockBg(block).
+  // This wrapper is kept as a pass-through for backward compat.
+  const wrapBg = (el: React.ReactElement) => el;
 
   switch (block.type) {
     case 'header': return wrapBg(<HeaderBlock {...common} />);
@@ -290,11 +290,15 @@ const HeaderBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }
   const hasCustomBg = !!block.backgroundColor;
   const logoX = parseInt(block.style?.logoX || '0') || 0;
   const logoY = parseInt(block.style?.logoY || '0') || 0;
+  const logoHeight = parseInt(block.style?.logoHeight || '42') || 42;
+  const logoOpacity = parseFloat(block.style?.logoOpacity || '1');
+  const bgSize = block.style?.headerBgSize || 'cover';
+  const bgPos = block.style?.headerBgPos || 'center';
   const bgStyle: React.CSSProperties = block.backgroundImage
     ? {
         backgroundImage: `url(${block.backgroundImage})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundSize: bgSize,
+        backgroundPosition: bgPos,
         backgroundColor: headerBg || style.colorPrimary,
       }
     : headerBg
@@ -322,11 +326,12 @@ const HeaderBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }
                 <Img
                   src={logoSrc}
                   alt={block.content || 'Logo'}
-                  height={42}
+                  height={logoHeight}
                   style={{
-                    height: 42,
+                    height: logoHeight,
                     width: 'auto',
                     display: 'block',
+                    opacity: logoOpacity,
                   }}
                 />
               ) : (
@@ -527,7 +532,7 @@ const TextBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) 
   if (block.style?.textTransform) textStyle.textTransform = block.style.textTransform as React.CSSProperties['textTransform'];
 
   return (
-    <Section className="em-pad" style={{ padding: isTitle ? bPad(block, 36, 48, 8, 48) : bPad(block, 8, 48, 20, 48) }}>
+    <Section className="em-pad" style={{ padding: isTitle ? bPad(block, 36, 48, 8, 48) : bPad(block, 8, 48, 20, 48), ...getBlockBg(block) }}>
       {isTitle ? (
         <>
           {/* Thick accent bar */}
@@ -607,7 +612,7 @@ const ImageBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
     : `'${bodyFont}', Arial, sans-serif`;
 
   return (
-    <Section style={{ padding: bPad(block, 24, 48, 24, 48) }}>
+    <Section style={{ padding: bPad(block, 24, 48, 24, 48), ...getBlockBg(block) }}>
       {block.imageUrl ? (
         <>
           <Img
@@ -678,7 +683,7 @@ const BulletsBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
   };
 
   return (
-    <Section className="em-pad" style={{ padding: bPad(block, 20, 48, 28, 48) }}>
+    <Section className="em-pad" style={{ padding: bPad(block, 20, 48, 28, 48), ...getBlockBg(block) }}>
       {items.map((item, i) => (
         <Section
           key={i}
@@ -754,11 +759,14 @@ const CtaBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => {
   const ctaFont = block.style?.fontFamily || titleFont;
   const ctaFontSize = block.style?.fontSize ? parseInt(block.style.fontSize) : 14;
   const ctaAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center';
+  const hasCustomBg = !!(block.backgroundImage || block.backgroundColor);
 
   return (
     <Section
       style={{
-        background: `linear-gradient(135deg, ${bandColor} 0%, ${darken(bandColor, 0.15)} 100%)`,
+        ...(hasCustomBg
+          ? getBlockBg(block)
+          : { background: `linear-gradient(135deg, ${bandColor} 0%, ${darken(bandColor, 0.15)} 100%)` }),
         padding: bPad(block, 44, 48, 44, 48),
         textAlign: ctaAlign,
       }}
@@ -812,7 +820,7 @@ const DividerBlock: React.FC<BlockProps> = ({ block, style }) => {
   const lineColor = block.style?.dividerColor || '#e5e5ea';
   const dotColor = block.style?.dividerDotColor || style.colorPrimary;
   return (
-    <Section style={{ padding: bPad(block, 24, 48, 24, 48) }}>
+    <Section style={{ padding: bPad(block, 24, 48, 24, 48), ...getBlockBg(block) }}>
       <Row>
         <Column style={{ verticalAlign: 'middle' }}>
           <Section style={{ height: 1, backgroundColor: lineColor }} />
@@ -848,8 +856,13 @@ const FooterBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
   const fontFam = customFont ? `'${customFont}', Arial, sans-serif` : `'${bodyFont}', Arial, sans-serif`;
   const fBtnColor = block.style?.socialBtnColor || alpha('#ffffff', 0.6);
   const qrUrl = block.style?.footerQrUrl;
+  const qrImageUrl = block.style?.footerQrImageUrl;
   const qrLabel = block.style?.footerQrLabel || 'Escanea para más info';
   const companyInfo = block.style?.footerCompanyInfo;
+  const footerBgColor = block.backgroundColor || '#111117';
+  const footerLogoUrl = block.imageUrl || style.logoUrl;
+  const footerLogoHeight = parseInt(block.style?.footerLogoHeight || '30');
+  const footerLogoOpacity = parseFloat(block.style?.footerLogoOpacity || '0.6');
 
   return (
     <Section style={{ padding: 0 }}>
@@ -862,23 +875,23 @@ const FooterBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
       />
       <Section
         style={{
-          backgroundColor: '#111117',
+          backgroundColor: footerBgColor,
           padding: bPad(block, 36, 48, 32, 48),
           textAlign: 'center',
         }}
       >
         {/* Logo */}
-        {style.logoUrl && (
+        {footerLogoUrl && (
           <Img
-            src={style.logoUrl}
+            src={footerLogoUrl}
             alt=""
-            height={30}
+            height={footerLogoHeight}
             style={{
-              height: 30,
+              height: footerLogoHeight,
               width: 'auto',
               display: 'block',
               margin: '0 auto 20px',
-              opacity: 0.6,
+              opacity: footerLogoOpacity,
             }}
           />
         )}
@@ -929,17 +942,27 @@ const FooterBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
         />
 
         {/* QR Code */}
-        {qrUrl && (
+        {(qrImageUrl || qrUrl) && (
           <Section style={{ marginBottom: 20, textAlign: 'center' }}>
-            <a href={qrUrl} style={{ textDecoration: 'none' }}>
+            {qrImageUrl ? (
               <Img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}&bgcolor=111117&color=ffffff`}
+                src={qrImageUrl}
                 alt="QR Code"
                 width={100}
                 height={100}
                 style={{ display: 'block', margin: '0 auto 8px', width: 100, height: 100 }}
               />
-            </a>
+            ) : (
+              <a href={qrUrl!} style={{ textDecoration: 'none' }}>
+                <Img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl!)}&bgcolor=111117&color=ffffff`}
+                  alt="QR Code"
+                  width={100}
+                  height={100}
+                  style={{ display: 'block', margin: '0 auto 8px', width: 100, height: 100 }}
+                />
+              </a>
+            )}
             <Text style={{ fontFamily: fontFam, fontSize: 10, color: alpha('#ffffff', 0.25), margin: '0 0 4px', letterSpacing: '0.5px' }}>
               {qrLabel}
             </Text>
@@ -1013,6 +1036,7 @@ const QuoteBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
         backgroundColor: qBg,
         borderLeft: `6px solid ${qBorder}`,
         padding: bPad(block, 36, 48, 32, 48),
+        ...getBlockBg(block),
       }}
     >
       {/* Decorative icon */}
@@ -1109,7 +1133,7 @@ const SocialBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
   const fontFam = customFont ? `'${customFont}', Arial, sans-serif` : `'${bodyFont}', Arial, sans-serif`;
 
   return (
-    <Section style={{ padding: bPad(block, 28, 48, 28, 48), textAlign: 'center' }}>
+    <Section style={{ padding: bPad(block, 28, 48, 28, 48), textAlign: 'center', ...getBlockBg(block) }}>
       {block.content && (
         <Text
           style={{
@@ -1183,7 +1207,7 @@ const VideoBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => {
   const vAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'center';
 
   return (
-    <Section style={{ padding: bPad(block, 24, 48, 24, 48) }}>
+    <Section style={{ padding: bPad(block, 24, 48, 24, 48), ...getBlockBg(block) }}>
       <a href={videoUrl} style={{ display: 'block', textDecoration: 'none' }}>
         <Section
           style={{
@@ -1312,9 +1336,9 @@ const ColumnsBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
   };
 
   return (
-    <Section className="em-pad em-stack" style={{ padding: bPad(block, 24, 48, 24, 48) }}>
+    <Section className="em-pad em-stack" style={{ padding: bPad(block, 24, 48, 24, 48), ...getBlockBg(block) }}>
       <Row>
-        <Column style={{ width: '48%', verticalAlign: 'top', paddingRight: 16 }}>
+        <Column style={{ width: '48%', verticalAlign: 'top', paddingRight: 16, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined }}>
           <Text style={colTextStyle}>
             <Lines text={left} />
           </Text>
@@ -1331,7 +1355,7 @@ const ColumnsBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
             }}
           />
         </Column>
-        <Column style={{ width: '48%', verticalAlign: 'top', paddingLeft: 16 }}>
+        <Column style={{ width: '48%', verticalAlign: 'top', paddingLeft: 16, textAlign: (block.style?.textAlign as React.CSSProperties['textAlign']) || undefined }}>
           <Text style={colTextStyle}>
             <Lines text={right} />
           </Text>
