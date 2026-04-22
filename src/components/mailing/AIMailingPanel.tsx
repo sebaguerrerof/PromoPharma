@@ -47,6 +47,8 @@ const CONTENT_BLOCKS: { key: ContentBlockType; label: string; icon: string; desc
   { key: 'image', label: 'Imagen', icon: '🏞️', description: 'Foto o ilustración' },
   { key: 'bullets', label: 'Bullets', icon: '📋', description: 'Lista con puntos' },
   { key: 'cta', label: 'CTA', icon: '🔘', description: 'Botón de acción' },
+  { key: 'event', label: 'Evento', icon: '📅', description: 'Fecha, hora y registro' },
+  { key: 'speaker', label: 'Speaker', icon: '🎙️', description: 'Perfil del ponente' },
   { key: 'quote', label: 'Cita', icon: '💬', description: 'Texto destacado' },
   { key: 'divider', label: 'Separador', icon: '➖', description: 'Línea divisoria' },
   { key: 'columns', label: 'Columnas', icon: '📊', description: 'Contenido en 2 cols' },

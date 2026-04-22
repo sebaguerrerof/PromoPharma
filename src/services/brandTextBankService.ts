@@ -96,7 +96,7 @@ export function extractTextsFromBlocks(
   };
 
   for (const block of blocks) {
-    if (!block.content && block.type !== 'hero') continue;
+    if (!block.content && block.type !== 'hero' && block.type !== 'event' && block.type !== 'speaker') continue;
 
     switch (block.type) {
       case 'text':
@@ -118,6 +118,17 @@ export function extractTextsFromBlocks(
       case 'cta':
         if (block.ctaText?.trim()) texts.ctaTexts.push(block.ctaText.trim());
         if (block.content.trim()) texts.ctaLabels.push(block.content.trim());
+        break;
+      case 'event':
+        if (block.style?.eventTitle?.trim()) texts.titles.push(block.style.eventTitle.trim());
+        if (block.style?.eventDescription?.trim()) texts.paragraphs.push(block.style.eventDescription.trim());
+        if (block.ctaText?.trim()) texts.ctaTexts.push(block.ctaText.trim());
+        if (block.content.trim()) texts.ctaLabels.push(block.content.trim());
+        break;
+      case 'speaker':
+        if (block.style?.speakerName?.trim()) texts.titles.push(block.style.speakerName.trim());
+        if (block.style?.speakerBio?.trim()) texts.paragraphs.push(block.style.speakerBio.trim());
+        if (block.style?.speakerRole?.trim()) texts.paragraphs.push(block.style.speakerRole.trim());
         break;
       case 'quote':
         if (block.content.trim()) texts.quotes.push(block.content.trim());

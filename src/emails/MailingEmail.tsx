@@ -93,6 +93,27 @@ const Lines: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
+type SemanticTag = 'p' | 'h1' | 'h2' | 'h3' | 'h4';
+
+const normalizeSemanticTag = (tag: string | undefined, fallback: SemanticTag = 'p'): SemanticTag => {
+  if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'p') return tag;
+  return fallback;
+};
+
+const readFontSize = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseInt(value || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const renderSemanticText = (
+  tag: SemanticTag,
+  content: React.ReactNode,
+  textStyle: React.CSSProperties,
+) => {
+  if (tag === 'p') return <Text style={textStyle}>{content}</Text>;
+  return <Heading as={tag} style={textStyle}>{content}</Heading>;
+};
+
 // ── Main Component ───────────────────────────────────────
 
 export const MailingEmail: React.FC<MailingEmailProps> = ({
@@ -251,6 +272,8 @@ const BlockRenderer: React.FC<{
     case 'image':  return wrapBg(<ImageBlock {...common} />);
     case 'bullets': return wrapBg(<BulletsBlock {...common} />);
     case 'cta':    return wrapBg(<CtaBlock {...common} />);
+    case 'event':  return wrapBg(<EventBlock {...common} />);
+    case 'speaker': return wrapBg(<SpeakerBlock {...common} />);
     case 'divider': return wrapBg(<DividerBlock {...common} />);
     case 'spacer': return <SpacerBlock {...common} />;
     case 'footer': return wrapBg(<FooterBlock {...common} />);
@@ -808,6 +831,306 @@ const CtaBlock: React.FC<BlockProps> = ({ block, style, titleFont }) => {
       >
         {block.ctaText || 'Más información'} →
       </Button>
+    </Section>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// EVENT — Date/time card + registration CTA
+// ═══════════════════════════════════════════════════════════
+
+const EventBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) => {
+  const bandColor = block.style?.bandBgColor || style.colorPrimary;
+  const btnBg = block.style?.btnBgColor || '#ffffff';
+  const btnText = block.style?.btnTextColor || style.colorPrimary;
+  const labelColor = block.style?.color || alpha('#ffffff', 0.72);
+  const eventFont = block.style?.fontFamily || titleFont;
+  const eventAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'left';
+  const eventTitle = block.style?.eventTitle || 'Actualización científica exclusiva';
+  const eventDescription = block.style?.eventDescription || 'Revisa evidencia clínica relevante y participa en una conversación práctica con especialistas.';
+  const eventDate = block.style?.eventDate || 'Jueves 12 de junio';
+  const eventTime = block.style?.eventTime || '19:00 h';
+  const eventLocation = block.style?.eventLocation || 'Streaming en vivo';
+  const eventSpeaker = block.style?.eventSpeaker || 'Dra. Valentina Rojas';
+  const eventCapacity = block.style?.eventCapacity || '120 cupos';
+  const eventMode = block.style?.eventMode || 'Online';
+  const buttonLabel = block.ctaText || 'Inscribirse';
+  const hasCustomBg = !!(block.backgroundImage || block.backgroundColor);
+  const metaItems = [eventMode, eventLocation, eventSpeaker, eventCapacity].filter(Boolean);
+  const eventLabelTag = normalizeSemanticTag(block.style?.eventLabelTag, 'p');
+  const eventTitleTag = normalizeSemanticTag(block.style?.eventTitleTag, 'h3');
+  const eventDescriptionTag = normalizeSemanticTag(block.style?.eventDescriptionTag, 'p');
+  const eventDateTag = normalizeSemanticTag(block.style?.eventDateTag, 'h3');
+  const eventTimeTag = normalizeSemanticTag(block.style?.eventTimeTag, 'p');
+  const eventLabelFont = block.style?.eventLabelFont || eventFont;
+  const eventTitleFont = block.style?.eventTitleFont || eventFont;
+  const eventDescriptionFont = block.style?.eventDescriptionFont || bodyFont;
+  const eventDateFont = block.style?.eventDateFont || eventFont;
+  const eventTimeFont = block.style?.eventTimeFont || bodyFont;
+  const eventMetaFont = block.style?.eventMetaFont || bodyFont;
+  const eventButtonFont = block.style?.eventButtonFont || eventFont;
+  const eventLabelSize = readFontSize(block.style?.eventLabelSize, 12);
+  const eventTitleSize = readFontSize(block.style?.eventTitleSize, 24);
+  const eventDescriptionSize = readFontSize(block.style?.eventDescriptionSize, 14);
+  const eventDateSize = readFontSize(block.style?.eventDateSize, 24);
+  const eventTimeSize = readFontSize(block.style?.eventTimeSize, 13);
+  const eventMetaSize = readFontSize(block.style?.eventMetaSize, 11);
+  const eventButtonSize = readFontSize(block.style?.eventButtonSize, 14);
+
+  return (
+    <Section
+      style={{
+        ...(hasCustomBg
+          ? getBlockBg(block)
+          : { background: `linear-gradient(135deg, ${bandColor} 0%, ${darken(bandColor, 0.15)} 100%)` }),
+        padding: bPad(block, 36, 40, 36, 40),
+        textAlign: eventAlign,
+      }}
+    >
+      <Section style={{ position: 'relative' }}>
+        <div style={{ position: 'absolute', right: -30, top: -34, width: 128, height: 128, borderRadius: 999, backgroundColor: alpha('#ffffff', 0.06) }} />
+      </Section>
+      {block.content && (
+        renderSemanticText(eventLabelTag, block.content, {
+          fontFamily: `'${eventLabelFont}', Arial, sans-serif`,
+          fontSize: eventLabelSize,
+          color: labelColor,
+          margin: '0 0 18px',
+          letterSpacing: '2px',
+          textTransform: 'uppercase',
+          fontWeight: 600,
+          lineHeight: '1.3',
+        })
+      )}
+
+      <Section>
+        <Row>
+          <Column style={{ width: 170, paddingRight: 16, verticalAlign: 'top' }}>
+            <Section style={{ backgroundColor: alpha('#ffffff', 0.12), border: `1px solid ${alpha('#ffffff', 0.14)}`, borderRadius: 10 }}>
+              <Text style={{ margin: '0', padding: '14px 16px 0', fontSize: 11, letterSpacing: '1.3px', textTransform: 'uppercase' as const, color: labelColor, fontWeight: 600, fontFamily: `'${bodyFont}', Arial, sans-serif` }}>
+                Fecha
+              </Text>
+              {renderSemanticText(eventDateTag, eventDate, {
+                margin: '0',
+                padding: '6px 16px 0',
+                fontSize: eventDateSize,
+                lineHeight: '1.2',
+                color: '#ffffff',
+                fontWeight: 800,
+                fontFamily: `'${eventDateFont}', Arial, sans-serif`,
+              })}
+              {renderSemanticText(eventTimeTag, eventTime, {
+                margin: '0',
+                padding: '8px 16px 16px',
+                fontSize: eventTimeSize,
+                color: alpha('#ffffff', 0.86),
+                fontWeight: 500,
+                lineHeight: '1.4',
+                fontFamily: `'${eventTimeFont}', Arial, sans-serif`,
+              })}
+            </Section>
+          </Column>
+          <Column style={{ verticalAlign: 'middle' }}>
+            {renderSemanticText(eventTitleTag, eventTitle, {
+              margin: '0 0 8px',
+              fontFamily: `'${eventTitleFont}', Arial, sans-serif`,
+              fontSize: eventTitleSize,
+              lineHeight: '1.2',
+              color: '#ffffff',
+              fontWeight: 900,
+              letterSpacing: '-0.3px',
+            })}
+            {renderSemanticText(eventDescriptionTag, <Lines text={eventDescription} />, {
+              margin: '0 0 18px',
+              fontSize: eventDescriptionSize,
+              lineHeight: '1.6',
+              color: alpha('#ffffff', 0.84),
+              fontFamily: `'${eventDescriptionFont}', Arial, sans-serif`,
+            })}
+            {metaItems.length > 0 && (
+              <Section style={{ marginBottom: 18 }}>
+                <Text style={{ margin: 0, fontSize: 0, lineHeight: '0px' }}>
+                  {metaItems.map((item) => (
+                    <span key={item} style={{ display: 'inline-block', padding: '6px 10px', margin: '0 6px 6px 0', borderRadius: 999, backgroundColor: alpha('#ffffff', 0.1), border: `1px solid ${alpha('#ffffff', 0.1)}`, fontSize: eventMetaSize, lineHeight: '14px', color: alpha('#ffffff', 0.9), fontFamily: `'${eventMetaFont}', Arial, sans-serif` }}>
+                      {item}
+                    </span>
+                  ))}
+                </Text>
+              </Section>
+            )}
+            <Button
+              href={block.ctaUrl && !/^https?:\/\//i.test(block.ctaUrl) && block.ctaUrl !== '#' ? `https://${block.ctaUrl}` : (block.ctaUrl || '#')}
+              style={{
+                display: 'inline-block',
+                padding: '14px 30px',
+                backgroundColor: btnBg,
+                color: btnText,
+                fontFamily: `'${eventButtonFont}', Arial, sans-serif`,
+                fontSize: eventButtonSize,
+                fontWeight: 800,
+                textDecoration: 'none',
+                borderRadius: 6,
+                letterSpacing: '0.3px',
+                border: 'none',
+                textTransform: 'uppercase' as const,
+              }}
+            >
+              {buttonLabel}
+            </Button>
+          </Column>
+        </Row>
+      </Section>
+    </Section>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+// SPEAKER — Dedicated expert profile card
+// ═══════════════════════════════════════════════════════════
+
+const SpeakerBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont }) => {
+  const speakerName = block.style?.speakerName || 'Dra. Valentina Rojas';
+  const speakerRole = block.style?.speakerRole || 'Especialista invitada';
+  const speakerBio = block.style?.speakerBio || 'Compartirá una mirada clínica práctica sobre evidencia reciente y aplicación en pacientes reales.';
+  const speakerOrg = block.style?.speakerOrg || 'Hospital Clínico';
+  const cardBg = block.style?.speakerCardBg || '#f8fafc';
+  const imageShape = block.style?.speakerImageShape || 'circle';
+  const speakerVariant = block.style?.speakerVariant || 'classic';
+  const photoRadius = imageShape === 'circle' ? 999 : 18;
+  const speakerLabelTag = normalizeSemanticTag(block.style?.speakerLabelTag, 'p');
+  const speakerNameTag = normalizeSemanticTag(block.style?.speakerNameTag, 'h3');
+  const speakerMetaTag = normalizeSemanticTag(block.style?.speakerMetaTag, 'p');
+  const speakerBioTag = normalizeSemanticTag(block.style?.speakerBioTag, 'p');
+  const speakerLabelFont = block.style?.speakerLabelFont || titleFont;
+  const speakerNameFont = block.style?.speakerNameFont || titleFont;
+  const speakerMetaFont = block.style?.speakerMetaFont || bodyFont;
+  const speakerBioFont = block.style?.speakerBioFont || bodyFont;
+  const speakerLabelSize = readFontSize(block.style?.speakerLabelSize, 12);
+  const speakerNameSize = readFontSize(block.style?.speakerNameSize, speakerVariant === 'spotlight' ? 28 : 26);
+  const speakerMetaSize = readFontSize(block.style?.speakerMetaSize, 14);
+  const speakerBioSize = readFontSize(block.style?.speakerBioSize, 14);
+
+  if (speakerVariant === 'spotlight') {
+    return (
+      <Section style={{ padding: bPad(block, 28, 40, 28, 40), ...getBlockBg(block) }}>
+        <Section style={{ background: `linear-gradient(135deg, ${style.colorPrimary}, ${darken(style.colorPrimary, 0.12)})`, borderRadius: 24, padding: '30px 30px 28px', overflow: 'hidden' }}>
+          <Row>
+            <Column style={{ width: 154, verticalAlign: 'top', paddingRight: 22 }}>
+              {block.imageUrl ? (
+                <Img
+                  src={block.imageUrl}
+                  alt={speakerName}
+                  style={{ width: 132, height: 132, objectFit: 'cover', borderRadius: photoRadius, display: 'block', border: `4px solid ${alpha('#ffffff', 0.18)}` }}
+                />
+              ) : (
+                <Section style={{ width: 132, height: 132, borderRadius: photoRadius, backgroundColor: alpha('#ffffff', 0.12), textAlign: 'center' }}>
+                  <Text style={{ margin: '48px 0 0', fontSize: 34, fontWeight: 800, color: '#ffffff', fontFamily: `'${titleFont}', Arial, sans-serif` }}>
+                    {speakerName.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').slice(0, 2) || 'SP'}
+                  </Text>
+                </Section>
+              )}
+            </Column>
+            <Column style={{ verticalAlign: 'middle' }}>
+              {block.content && (
+                renderSemanticText(speakerLabelTag, block.content, {
+                  margin: '0 0 12px',
+                  fontFamily: `'${speakerLabelFont}', Arial, sans-serif`,
+                  fontSize: speakerLabelSize,
+                  letterSpacing: '1.9px',
+                  textTransform: 'uppercase',
+                  color: alpha('#ffffff', 0.76),
+                  fontWeight: 700,
+                  lineHeight: '1.3',
+                })
+              )}
+              {renderSemanticText(speakerNameTag, speakerName, {
+                margin: '0 0 8px',
+                fontFamily: `'${speakerNameFont}', Arial, sans-serif`,
+                fontSize: speakerNameSize,
+                lineHeight: '1.1',
+                color: '#ffffff',
+                fontWeight: 900,
+              })}
+              {renderSemanticText(speakerMetaTag, `${speakerRole}${speakerOrg ? ` · ${speakerOrg}` : ''}`, {
+                margin: '0 0 14px',
+                fontFamily: `'${speakerMetaFont}', Arial, sans-serif`,
+                fontSize: speakerMetaSize,
+                lineHeight: '1.5',
+                color: alpha('#ffffff', 0.86),
+                fontWeight: 700,
+              })}
+              {renderSemanticText(speakerBioTag, <Lines text={speakerBio} />, {
+                margin: 0,
+                fontFamily: `'${speakerBioFont}', Arial, sans-serif`,
+                fontSize: speakerBioSize,
+                lineHeight: '1.7',
+                color: alpha('#ffffff', 0.9),
+              })}
+            </Column>
+          </Row>
+        </Section>
+      </Section>
+    );
+  }
+
+  return (
+    <Section style={{ padding: bPad(block, 28, 40, 28, 40), ...getBlockBg(block) }}>
+      <Section style={{ backgroundColor: cardBg, borderRadius: 22, padding: '28px 28px 24px', border: `1px solid ${alpha(style.colorPrimary, 0.10)}` }}>
+        {block.content && (
+          renderSemanticText(speakerLabelTag, block.content, {
+            margin: '0 0 14px',
+            fontFamily: `'${speakerLabelFont}', Arial, sans-serif`,
+            fontSize: speakerLabelSize,
+            letterSpacing: '1.8px',
+            textTransform: 'uppercase',
+            color: style.colorPrimary,
+            fontWeight: 700,
+            lineHeight: '1.3',
+          })
+        )}
+        <Row>
+          <Column style={{ width: 120, verticalAlign: 'top', paddingRight: 18 }}>
+            {block.imageUrl ? (
+              <Img
+                src={block.imageUrl}
+                alt={speakerName}
+                style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: photoRadius, display: 'block', border: `4px solid ${alpha(style.colorPrimary, 0.10)}` }}
+              />
+            ) : (
+              <Section style={{ width: 96, height: 96, borderRadius: photoRadius, background: `linear-gradient(135deg, ${alpha(style.colorPrimary, 0.12)}, ${alpha(style.colorSecondary, 0.16)})`, textAlign: 'center' }}>
+                <Text style={{ margin: '36px 0 0', fontSize: 26, fontWeight: 800, color: style.colorPrimary, fontFamily: `'${titleFont}', Arial, sans-serif` }}>
+                  {speakerName.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').slice(0, 2) || 'SP'}
+                </Text>
+              </Section>
+            )}
+          </Column>
+          <Column style={{ verticalAlign: 'top' }}>
+            {renderSemanticText(speakerNameTag, speakerName, {
+              margin: '0 0 6px',
+              fontFamily: `'${speakerNameFont}', Arial, sans-serif`,
+              fontSize: speakerNameSize,
+              lineHeight: '1.15',
+              color: '#111827',
+              fontWeight: 900,
+            })}
+            {renderSemanticText(speakerMetaTag, `${speakerRole}${speakerOrg ? ` · ${speakerOrg}` : ''}`, {
+              margin: '0 0 14px',
+              fontFamily: `'${speakerMetaFont}', Arial, sans-serif`,
+              fontSize: speakerMetaSize,
+              lineHeight: '1.5',
+              color: style.colorPrimary,
+              fontWeight: 700,
+            })}
+            {renderSemanticText(speakerBioTag, <Lines text={speakerBio} />, {
+              margin: 0,
+              fontFamily: `'${speakerBioFont}', Arial, sans-serif`,
+              fontSize: speakerBioSize,
+              lineHeight: '1.7',
+              color: '#4b5563',
+            })}
+          </Column>
+        </Row>
+      </Section>
     </Section>
   );
 };

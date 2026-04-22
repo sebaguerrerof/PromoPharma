@@ -190,6 +190,7 @@ export async function generateAIMailing(
 
 function buildMailingSystemPrompt(context: AIMailingContext): string {
   const { brand, claims, insights, availableTemplates, systemRules } = context;
+  const promptLower = context.userPrompt.toLowerCase();
 
   // Claims agrupados por indicación
   const claimsByIndication = new Map<string, string[]>();
@@ -255,6 +256,10 @@ function buildMailingSystemPrompt(context: AIMailingContext): string {
 El email DEBE contener exactamente estos bloques de contenido (además de header y footer que son obligatorios):
 ${selectedBlocks.map((b, i) => `  ${i + 1}. ${b}`).join('\n')}
 Respeta este orden. NO agregues bloques de contenido adicionales que no estén en esta lista.`
+    : '';
+  const shouldPrioritizeSpeaker = !selectedBlocks?.includes('speaker') && /(speaker|ponente|expositor|charla|webinar|simposio|conferencia|panelista)/i.test(promptLower);
+  const speakerInstruction = shouldPrioritizeSpeaker
+    ? 'El prompt sugiere que hay un ponente o expositor. Incluye obligatoriamente un bloque speaker dedicado además del bloque event si corresponde.'
     : '';
 
   // TextBank — corpus de textos anteriores de la marca
@@ -328,6 +333,7 @@ ${typeInstruction ? `\n═══ INSTRUCCIÓN POR TIPO ═══\n${typeInstruct
 ${toneInstruction ? `\n═══ TONO ═══\n${toneInstruction}` : ''}
 ${lengthInstruction ? `\n═══ LONGITUD ═══\n${lengthInstruction}` : ''}
 ${blocksInstruction ? `\n═══ BLOQUES SELECCIONADOS ═══\n${blocksInstruction}` : ''}
+${speakerInstruction ? `\n═══ HEURÍSTICA DE SPEAKER ═══\n${speakerInstruction}` : ''}
 ${textBankSection}
 
 ═══ FORMATO DE RESPUESTA ═══
@@ -346,7 +352,7 @@ Devuelve SOLO un JSON válido (sin markdown, sin \`\`\`json) con esta estructura
   "blocks": [
     {
       "id": "ai_[type]_[n]",
-      "type": "header|hero|text|image|cta|footer|spacer|divider|bullets|columns|quote|social|video",
+      "type": "header|hero|text|image|cta|event|speaker|footer|spacer|divider|bullets|columns|quote|social|video",
       "content": "...",
       "imageUrl": "...",
       "ctaText": "...",
@@ -374,6 +380,8 @@ El sistema de renderizado agrega automáticamente el formato visual (negritas, i
 - text (párrafo): content = párrafo (texto plano, 40-80 palabras, usa \n para saltos de línea). style: fontSize, color, textAlign
 - bullets: content = un punto por línea separados con \n (texto plano, SIN viñetas •, SIN números, SIN HTML). style: bulletStyle ("number"|"bullet"|"letter"), bulletBadgeBg="${brand.colorPrimary}"
 - cta: content = etiqueta superior en texto plano (o vacío). ctaText = texto del botón (texto plano, 2-4 palabras). ctaUrl = URL. style: bandBgColor="${brand.colorPrimary}", btnBgColor="#ffffff", btnTextColor="${brand.colorPrimary}" (SIEMPRE usar estos valores exactos para asegurar contraste)
+- event: content = etiqueta superior opcional (texto plano). ctaText = texto del botón (2-4 palabras, ej: "Inscribirse"). ctaUrl = URL de inscripción. style: eventTitle, eventDescription, eventDate, eventTime, eventLocation, eventSpeaker, eventCapacity, eventMode, bandBgColor="${brand.colorPrimary}", btnBgColor="#ffffff", btnTextColor="${brand.colorPrimary}"
+- speaker: content = etiqueta superior opcional (texto plano, ej: "Speaker invitado"). imageUrl = foto del speaker o "" si no la tienes. style: speakerName, speakerRole, speakerBio, speakerOrg, speakerImageShape ("circle"|"rounded"), speakerCardBg, speakerVariant ("classic"|"spotlight")
 - quote: content = texto de la cita (texto plano, SIN comillas decorativas, SIN icono). quoteAuthor = autor (texto plano). style: quoteIcon ("❝" o un emoji, NO escribir el icono en content), quoteBg, quoteBorder, quoteAuthorColor. IMPORTANTE: El icono decorativo se agrega automáticamente vía style.quoteIcon, NO lo incluyas en content.
 - footer: content = disclaimer breve (MÁXIMO 130 caracteres, texto plano). Debe ser conciso: solo lo esencial del aviso legal. socialLinks = redes sociales. style: footerQrUrl, footerCompanyInfo
 - columns: content DEBE usar el separador ||| para dividir columnas. Formato EXACTO: "Texto columna izquierda|||Texto columna derecha". EJEMPLO: "Eficacia comprobada en estudios clínicos|||Perfil de seguridad favorable". Si no incluyes el separador |||, todo el texto aparecerá solo en la columna izquierda. style: headingLevel, accentBar
@@ -608,6 +616,31 @@ function applyBrandStylesToBlocks(
         s.btnTextColor = brand.colorPrimary;
         break;
 
+      case 'event':
+        s.bandBgColor = brand.colorPrimary;
+        s.btnBgColor = '#ffffff';
+        s.btnTextColor = brand.colorPrimary;
+        if (!s.eventTitle) s.eventTitle = 'Actualización científica exclusiva';
+        if (!s.eventDescription) s.eventDescription = 'Revisa evidencia clínica relevante y participa en una conversación práctica con especialistas.';
+        if (!s.eventDate) s.eventDate = 'Jueves 12 de junio';
+        if (!s.eventTime) s.eventTime = '19:00 h';
+        if (!s.eventLocation) s.eventLocation = 'Streaming en vivo';
+        if (!s.eventSpeaker) s.eventSpeaker = 'Dra. Valentina Rojas';
+        if (!s.eventCapacity) s.eventCapacity = '120 cupos';
+        if (!s.eventMode) s.eventMode = 'Online';
+        if (!block.ctaText) block.ctaText = 'Inscribirse';
+        break;
+
+      case 'speaker':
+        if (!s.speakerName) s.speakerName = 'Dra. Valentina Rojas';
+        if (!s.speakerRole) s.speakerRole = 'Especialista invitada';
+        if (!s.speakerBio) s.speakerBio = 'Compartirá una mirada clínica práctica sobre evidencia reciente y aplicación en pacientes reales.';
+        if (!s.speakerOrg) s.speakerOrg = 'Hospital Clínico';
+        if (!s.speakerImageShape) s.speakerImageShape = 'circle';
+        if (!s.speakerCardBg) s.speakerCardBg = '#f8fafc';
+        if (!s.speakerVariant) s.speakerVariant = 'classic';
+        break;
+
       case 'footer':
         if (brand.qrUrl && !s.footerQrUrl) s.footerQrUrl = brand.qrUrl;
         if (brand.disclaimerBadge && !block.content) {
@@ -677,7 +710,7 @@ async function validateMailingResponse(
 
   // CTA text length
   for (const block of blocks) {
-    if (block.type === 'cta' && block.ctaText && block.ctaText.length > CHAR_LIMITS.cta_text) {
+    if ((block.type === 'cta' || block.type === 'event') && block.ctaText && block.ctaText.length > CHAR_LIMITS.cta_text) {
       issues.push({
         type: 'warning',
         blockId: block.id,

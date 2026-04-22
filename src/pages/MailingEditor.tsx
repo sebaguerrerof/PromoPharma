@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   DndContext,
@@ -72,6 +72,8 @@ const BLOCK_LABELS: Record<DesignBlockType, string> = {
   text: 'Texto',
   image: 'Imagen',
   cta: 'Botón (CTA)',
+  event: 'Evento',
+  speaker: 'Speaker',
   footer: 'Pie de email',
   spacer: 'Espaciador',
   divider: 'Separador',
@@ -253,7 +255,30 @@ const MailingEditor: React.FC = () => {
     const newBlock: MailingBlockContent = {
       id: `block_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       type,
-      content: '',
+      content: type === 'event' ? 'ENCUENTRO CIENTÍFICO' : '',
+      ctaText: type === 'event' ? 'Inscribirse' : undefined,
+      style: type === 'event'
+        ? {
+            eventTitle: 'Actualización científica exclusiva',
+            eventDescription: 'Revisa evidencia clínica relevante y participa en una conversación práctica con especialistas.',
+            eventDate: 'Jueves 12 de junio',
+            eventTime: '19:00 h',
+            eventLocation: 'Streaming en vivo',
+            eventSpeaker: 'Dra. Valentina Rojas',
+            eventCapacity: '120 cupos',
+            eventMode: 'Online',
+          }
+        : type === 'speaker'
+          ? {
+              speakerName: 'Dra. Valentina Rojas',
+              speakerRole: 'Especialista invitada',
+              speakerOrg: 'Hospital Clínico',
+              speakerBio: 'Compartirá una mirada clínica práctica sobre evidencia reciente y aplicación en pacientes reales.',
+              speakerImageShape: 'circle',
+              speakerCardBg: '#f8fafc',
+              speakerVariant: 'classic',
+            }
+        : undefined,
     };
     setBlocks((prev) => {
       if (afterId) {
@@ -999,6 +1024,8 @@ const DesignMiniPreview: React.FC<{
         header: style.colorPrimary,
         footer: '#f3f4f6',
         cta: style.colorPrimary,
+        event: style.colorPrimary,
+        speaker: '#f1f5f9',
         hero: `${style.colorPrimary}22`,
         image: '#e5e7eb',
         divider: '#e5e7eb',
@@ -1099,7 +1126,7 @@ const SortableBlockItem: React.FC<{
 };
 
 const BLOCK_ICONS: Record<DesignBlockType, string> = {
-  header: '🏷️', hero: '🖼️', text: '📝', image: '🌄', cta: '🔘',
+  header: '🏷️', hero: '🖼️', text: '📝', image: '🌄', cta: '🔘', event: '📅', speaker: '🎙️',
   footer: '📋', spacer: '↕️', divider: '➖', bullets: '📌', columns: '▥',
   quote: '💬', social: '🔗', video: '🎬',
 };
@@ -1573,6 +1600,23 @@ const EmailVisualPreview: React.FC<{
 }> = ({ blocks, style, activeBlockId, onBlockClick, onReorder, onBlockChange }) => {
   const bodyFont = style.fontBody || 'Inter';
   const titleFont = style.fontTitle || 'Inter';
+  const normalizeTag = (tag: string | undefined, fallback: 'p' | 'h1' | 'h2' | 'h3' | 'h4' = 'p') => {
+    if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'h4' || tag === 'p') return tag;
+    return fallback;
+  };
+  const readSize = (value: string | undefined, fallback: number) => {
+    const parsed = Number.parseInt(value || '', 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+  const renderSemanticPreview = (
+    tag: string | undefined,
+    fallbackTag: 'p' | 'h1' | 'h2' | 'h3' | 'h4',
+    content: React.ReactNode,
+    textStyle: React.CSSProperties,
+  ) => {
+    const safeTag = normalizeTag(tag, fallbackTag);
+    return createElement(safeTag, { style: { margin: 0, ...textStyle } }, content);
+  };
 
   const previewSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1851,6 +1895,138 @@ const EmailVisualPreview: React.FC<{
             <span style={{ display: 'inline-block', backgroundColor: btnBg, color: btnTextColor, padding: '8px 28px', borderRadius: 4, fontSize: ctaFontSize, fontWeight: 800, fontFamily: `'${ctaFont}', sans-serif`, letterSpacing: '0.2px', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', textTransform: 'uppercase' as const }}>
               {block.ctaText || 'Más información'} →
             </span>
+          </div>,
+        block);
+      }
+      case 'event': {
+        const bandColor = block.style?.bandBgColor || style.colorPrimary;
+        const btnBg = block.style?.btnBgColor || '#ffffff';
+        const btnTextColor = block.style?.btnTextColor || style.colorPrimary;
+        const labelColor = block.style?.color || 'rgba(255,255,255,0.72)';
+        const eventFont = block.style?.fontFamily || titleFont;
+        const eventAlign = (block.style?.textAlign as React.CSSProperties['textAlign']) || 'left';
+        const eventTitle = block.style?.eventTitle || 'Actualización científica exclusiva';
+        const eventDescription = block.style?.eventDescription || 'Revisa evidencia clínica relevante y participa en una conversación práctica con especialistas.';
+        const eventDate = block.style?.eventDate || 'Jueves 12 de junio';
+        const eventTime = block.style?.eventTime || '19:00 h';
+        const eventLocation = block.style?.eventLocation || 'Streaming en vivo';
+        const eventSpeaker = block.style?.eventSpeaker || 'Dra. Valentina Rojas';
+        const eventCapacity = block.style?.eventCapacity || '120 cupos';
+        const eventMode = block.style?.eventMode || 'Online';
+        const eventLabelTag = block.style?.eventLabelTag;
+        const eventTitleTag = block.style?.eventTitleTag;
+        const eventDescriptionTag = block.style?.eventDescriptionTag;
+        const eventDateTag = block.style?.eventDateTag;
+        const eventTimeTag = block.style?.eventTimeTag;
+        const eventLabelFont = block.style?.eventLabelFont || eventFont;
+        const eventTitleFont = block.style?.eventTitleFont || eventFont;
+        const eventDescriptionFont = block.style?.eventDescriptionFont || bodyFont;
+        const eventDateFont = block.style?.eventDateFont || eventFont;
+        const eventTimeFont = block.style?.eventTimeFont || bodyFont;
+        const eventMetaFont = block.style?.eventMetaFont || bodyFont;
+        const eventButtonFont = block.style?.eventButtonFont || eventFont;
+        const eventLabelSize = Math.max(readSize(block.style?.eventLabelSize, 12) * 0.65, 7);
+        const eventTitleSize = Math.max(readSize(block.style?.eventTitleSize, 24) * 0.65, 10);
+        const eventDescriptionSize = Math.max(readSize(block.style?.eventDescriptionSize, 14) * 0.65, 8);
+        const eventDateSize = Math.max(readSize(block.style?.eventDateSize, 24) * 0.65, 10);
+        const eventTimeSize = Math.max(readSize(block.style?.eventTimeSize, 13) * 0.65, 8);
+        const eventMetaSize = Math.max(readSize(block.style?.eventMetaSize, 11) * 0.65, 7);
+        const eventButtonSize = Math.max(readSize(block.style?.eventButtonSize, 14) * 0.65, 8);
+        return wrapPreview(block.id,
+          <div style={{ background: `linear-gradient(145deg, ${bandColor}, ${darkenHex(bandColor, 0.18)})`, padding: '22px 24px', textAlign: eventAlign, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', right: -18, top: -22, width: 86, height: 86, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            {block.content && (
+              renderSemanticPreview(eventLabelTag, 'p', block.content, {
+                fontSize: eventLabelSize,
+                color: labelColor,
+                letterSpacing: '1.5px',
+                textTransform: (block.style?.textTransform as React.CSSProperties['textTransform']) || 'uppercase',
+                fontWeight: 600,
+                marginBottom: 10,
+                lineHeight: 1.3,
+                fontFamily: `'${eventLabelFont}', sans-serif`,
+              })
+            )}
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'stretch', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ minWidth: 116, backgroundColor: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, padding: '13px 14px', color: '#ffffff', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 8, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Fecha</div>
+                {renderSemanticPreview(eventDateTag, 'h3', eventDate, { fontSize: eventDateSize, fontWeight: 800, lineHeight: 1.25, fontFamily: `'${eventDateFont}', sans-serif` })}
+                {renderSemanticPreview(eventTimeTag, 'p', eventTime, { fontSize: eventTimeSize, opacity: 0.9, marginTop: 5, lineHeight: 1.35, fontFamily: `'${eventTimeFont}', sans-serif` })}
+              </div>
+              <div style={{ flex: 1, minWidth: 180 }}>
+                {renderSemanticPreview(eventTitleTag, 'h3', eventTitle, { fontFamily: `'${eventTitleFont}', sans-serif`, fontSize: eventTitleSize, color: '#ffffff', fontWeight: 900, lineHeight: 1.18, letterSpacing: '-0.3px' })}
+                {renderSemanticPreview(eventDescriptionTag, 'p', eventDescription, { fontFamily: `'${eventDescriptionFont}', sans-serif`, fontSize: eventDescriptionSize, color: 'rgba(255,255,255,0.82)', marginTop: 7, lineHeight: 1.55, whiteSpace: 'pre-line' })}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                  {[eventMode, eventLocation, eventSpeaker, eventCapacity].filter(Boolean).slice(0, 4).map((item) => (
+                    <span key={item} style={{ display: 'inline-block', padding: '4px 8px', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.1)', fontSize: eventMetaSize, color: 'rgba(255,255,255,0.88)', lineHeight: 1.2, fontFamily: `'${eventMetaFont}', sans-serif` }}>
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ alignSelf: 'center' }}>
+                <span style={{ display: 'inline-block', backgroundColor: btnBg, color: btnTextColor, padding: '8px 22px', borderRadius: 4, fontSize: eventButtonSize, fontWeight: 800, fontFamily: `'${eventButtonFont}', sans-serif`, letterSpacing: '0.2px', boxShadow: '0 2px 12px rgba(0,0,0,0.15)', textTransform: 'uppercase' as const }}>
+                  {block.ctaText || 'Inscribirse'}
+                </span>
+              </div>
+            </div>
+          </div>,
+        block);
+      }
+      case 'speaker': {
+        const speakerName = block.style?.speakerName || 'Dra. Valentina Rojas';
+        const speakerRole = block.style?.speakerRole || 'Especialista invitada';
+        const speakerOrg = block.style?.speakerOrg || 'Hospital Clínico';
+        const speakerBio = block.style?.speakerBio || 'Compartirá una mirada clínica práctica sobre evidencia reciente y aplicación en pacientes reales.';
+        const imageShape = block.style?.speakerImageShape || 'circle';
+        const cardBg = block.style?.speakerCardBg || '#f8fafc';
+        const speakerVariant = block.style?.speakerVariant || 'classic';
+        const speakerBg = speakerVariant === 'spotlight'
+          ? `linear-gradient(135deg, ${style.colorPrimary}, ${darkenHex(style.colorPrimary, 0.12)})`
+          : cardBg;
+        const speakerNameColor = speakerVariant === 'spotlight' ? '#ffffff' : '#111827';
+        const speakerMetaColor = speakerVariant === 'spotlight' ? 'rgba(255,255,255,0.82)' : style.colorPrimary;
+        const speakerBioColor = speakerVariant === 'spotlight' ? 'rgba(255,255,255,0.9)' : '#4b5563';
+        const speakerLabelTag = block.style?.speakerLabelTag;
+        const speakerNameTag = block.style?.speakerNameTag;
+        const speakerMetaTag = block.style?.speakerMetaTag;
+        const speakerBioTag = block.style?.speakerBioTag;
+        const speakerLabelFont = block.style?.speakerLabelFont || titleFont;
+        const speakerNameFont = block.style?.speakerNameFont || titleFont;
+        const speakerMetaFont = block.style?.speakerMetaFont || bodyFont;
+        const speakerBioFont = block.style?.speakerBioFont || bodyFont;
+        const speakerLabelSize = Math.max(readSize(block.style?.speakerLabelSize, 12) * 0.65, 7);
+        const speakerNameSize = Math.max(readSize(block.style?.speakerNameSize, speakerVariant === 'spotlight' ? 28 : 26) * 0.65, 10);
+        const speakerMetaSize = Math.max(readSize(block.style?.speakerMetaSize, 14) * 0.65, 8);
+        const speakerBioSize = Math.max(readSize(block.style?.speakerBioSize, 14) * 0.65, 8);
+        return wrapPreview(block.id,
+          <div style={{ padding: '18px 24px' }}>
+            <div style={{ background: speakerBg, borderRadius: 16, border: speakerVariant === 'spotlight' ? 'none' : `1px solid ${style.colorPrimary}18`, padding: '18px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+              <div style={{ width: speakerVariant === 'spotlight' ? 86 : 64, height: speakerVariant === 'spotlight' ? 86 : 64, borderRadius: imageShape === 'circle' ? 999 : 14, background: speakerVariant === 'spotlight' ? 'rgba(255,255,255,0.12)' : `linear-gradient(135deg, ${style.colorPrimary}22, ${style.colorSecondary}28)`, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {block.imageUrl ? (
+                  <img src={block.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (
+                  <span style={{ fontSize: speakerVariant === 'spotlight' ? 22 : 16, fontWeight: 800, color: speakerVariant === 'spotlight' ? '#ffffff' : style.colorPrimary }}>{speakerName.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]).join('').slice(0, 2) || 'SP'}</span>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {block.content && (
+                  renderSemanticPreview(speakerLabelTag, 'p', block.content, {
+                    fontSize: speakerLabelSize,
+                    letterSpacing: '1.5px',
+                    textTransform: 'uppercase',
+                    color: speakerVariant === 'spotlight' ? 'rgba(255,255,255,0.72)' : style.colorPrimary,
+                    fontWeight: 700,
+                    marginBottom: 6,
+                    lineHeight: 1.3,
+                    fontFamily: `'${speakerLabelFont}', sans-serif`,
+                  })
+                )}
+                {renderSemanticPreview(speakerNameTag, 'h3', speakerName, { fontFamily: `'${speakerNameFont}', sans-serif`, fontSize: speakerNameSize, color: speakerNameColor, fontWeight: 900, lineHeight: 1.2 })}
+                {renderSemanticPreview(speakerMetaTag, 'p', `${speakerRole}${speakerOrg ? ` · ${speakerOrg}` : ''}`, { fontFamily: `'${speakerMetaFont}', sans-serif`, fontSize: speakerMetaSize, color: speakerMetaColor, fontWeight: 700, marginTop: 5, lineHeight: 1.4 })}
+                {renderSemanticPreview(speakerBioTag, 'p', speakerBio, { fontFamily: `'${speakerBioFont}', sans-serif`, fontSize: speakerBioSize, color: speakerBioColor, marginTop: 8, lineHeight: 1.55, whiteSpace: 'pre-line' })}
+              </div>
+            </div>
           </div>,
         block);
       }
@@ -2190,8 +2366,96 @@ const BlockEditor: React.FC<{
   const [aiError, setAiError] = useState('');
 
 
-  const canSuggest = ['text', 'bullets', 'cta', 'header', 'hero', 'footer', 'quote'].includes(block.type);
+  const canSuggest = ['text', 'bullets', 'cta', 'event', 'speaker', 'header', 'hero', 'footer', 'quote'].includes(block.type);
   const isTitle = block.type === 'header' || block.type === 'hero' || (block.type === 'text' && block.style?.fontWeight === 'bold');
+  const commonFonts = ['Inter', 'Arial', 'Helvetica', 'Georgia', 'Times New Roman', 'Verdana', 'Trebuchet MS', 'Tahoma', 'Courier New', 'Palatino', 'Garamond'];
+  const fontOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const add = (f?: string) => {
+      if (!f) return;
+      if (seen.has(f)) return;
+      seen.add(f);
+      out.push(f);
+    };
+    add(style.fontTitle);
+    add(style.fontBody);
+    commonFonts.forEach(add);
+    return out;
+  }, [style.fontTitle, style.fontBody]);
+
+  const renderSemanticTextControls = (
+    label: string,
+    cfg: {
+      tagKey?: string;
+      fontKey: string;
+      sizeKey: string;
+      defaultTag?: 'p' | 'h1' | 'h2' | 'h3' | 'h4';
+      defaultSize: number;
+      defaultFontHint: string;
+    },
+  ) => {
+    const currentTag = (cfg.tagKey ? block.style?.[cfg.tagKey] : undefined) || cfg.defaultTag || 'p';
+    const currentFont = block.style?.[cfg.fontKey] || '';
+    const currentSize = Number.parseInt(block.style?.[cfg.sizeKey] || '', 10) || cfg.defaultSize;
+
+    return (
+      <div className="rounded-lg border border-gray-100 p-2.5 bg-gray-50/50 space-y-2">
+        <label className="block text-[10px] font-semibold text-gray-500">{label}</label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {cfg.tagKey && (
+            <select
+              value={currentTag}
+              onChange={(e) => {
+                const s = { ...block.style };
+                const next = e.target.value;
+                if (next === (cfg.defaultTag || 'p')) delete s[cfg.tagKey!];
+                else s[cfg.tagKey!] = next;
+                onChange({ style: s });
+              }}
+              className="px-2 py-1.5 rounded-lg border border-gray-200 text-[10px] focus:outline-none focus:border-blue-400"
+            >
+              <option value="p">Párrafo (p)</option>
+              <option value="h1">Título (h1)</option>
+              <option value="h2">Subtítulo (h2)</option>
+              <option value="h3">Sección (h3)</option>
+              <option value="h4">Detalle (h4)</option>
+            </select>
+          )}
+          <select
+            value={currentFont}
+            onChange={(e) => {
+              const s = { ...block.style };
+              if (!e.target.value) delete s[cfg.fontKey];
+              else s[cfg.fontKey] = e.target.value;
+              onChange({ style: s });
+            }}
+            className="px-2 py-1.5 rounded-lg border border-gray-200 text-[10px] focus:outline-none focus:border-blue-400"
+          >
+            <option value="">Fuente por defecto ({cfg.defaultFontHint})</option>
+            {fontOptions.map((font) => (
+              <option key={font} value={font}>{font}</option>
+            ))}
+          </select>
+          <input
+            type="number"
+            min={10}
+            max={72}
+            value={currentSize}
+            onChange={(e) => {
+              const s = { ...block.style };
+              const next = Number.parseInt(e.target.value, 10);
+              if (!Number.isFinite(next) || next <= 0 || next === cfg.defaultSize) delete s[cfg.sizeKey];
+              else s[cfg.sizeKey] = String(next);
+              onChange({ style: s });
+            }}
+            className="px-2 py-1.5 rounded-lg border border-gray-200 text-[10px] focus:outline-none focus:border-blue-400"
+            placeholder={`${cfg.defaultSize}px`}
+          />
+        </div>
+      </div>
+    );
+  };
 
   const handleSuggestCopy = async () => {
     if (!brand) return;
@@ -2479,7 +2743,7 @@ const BlockEditor: React.FC<{
         )}
 
         {/* ── Image upload + URL (hero, image) ── */}
-        {(block.type === 'hero' || block.type === 'image') && (
+        {(block.type === 'hero' || block.type === 'image' || block.type === 'speaker') && (
           <>
             {/* Hero overlay text fields */}
             {block.type === 'hero' && (
@@ -2771,8 +3035,8 @@ const BlockEditor: React.FC<{
           </>
         )}
 
-        {/* ── CTA Button controls ── */}
-        {block.type === 'cta' && (
+        {/* ── CTA / Event controls ── */}
+        {(block.type === 'cta' || block.type === 'event') && (
           <>
             <div>
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Etiqueta superior <span className="font-normal text-gray-400">(opcional)</span></label>
@@ -2780,17 +3044,151 @@ const BlockEditor: React.FC<{
                 value={block.content}
                 onChange={(e) => onChange({ content: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
-                placeholder="Ej: DESCUBRE MÁS"
+                placeholder={block.type === 'event' ? 'Ej: EVENTO MÉDICO' : 'Ej: DESCUBRE MÁS'}
               />
               <p className="text-[10px] text-gray-400 mt-0.5">Texto encima del botón. Déjalo vacío para ocultarlo.</p>
             </div>
+            {block.type === 'event' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Título del evento</label>
+                  <input
+                    value={block.style?.eventTitle || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, eventTitle: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="Actualización científica exclusiva"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Descripción breve</label>
+                  <textarea
+                    value={block.style?.eventDescription || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, eventDescription: e.target.value } })}
+                    rows={3}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm leading-relaxed focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition resize-none"
+                    placeholder="Resume por qué vale la pena asistir al evento."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Fecha</label>
+                  <input
+                    value={block.style?.eventDate || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, eventDate: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="Jueves 12 de junio"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Horario</label>
+                  <input
+                    value={block.style?.eventTime || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, eventTime: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="19:00 h"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Lugar / modalidad</label>
+                  <input
+                    value={block.style?.eventLocation || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, eventLocation: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="Auditorio Central o streaming en vivo"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Speaker / ponente</label>
+                  <input
+                    value={block.style?.eventSpeaker || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, eventSpeaker: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="Dra. Valentina Rojas"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Cupos</label>
+                  <input
+                    value={block.style?.eventCapacity || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, eventCapacity: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="120 cupos"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Modalidad</label>
+                  <input
+                    value={block.style?.eventMode || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, eventMode: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="Online, Presencial o Híbrido"
+                  />
+                </div>
+              </div>
+            )}
+            {block.type === 'event' && (
+              <div className="pt-2 border-t border-gray-100 space-y-2">
+                <label className="block text-[11px] font-semibold text-gray-500">Jerarquía y tipografía del evento</label>
+                {renderSemanticTextControls('Etiqueta superior', {
+                  tagKey: 'eventLabelTag',
+                  fontKey: 'eventLabelFont',
+                  sizeKey: 'eventLabelSize',
+                  defaultTag: 'p',
+                  defaultSize: 12,
+                  defaultFontHint: style.fontTitle,
+                })}
+                {renderSemanticTextControls('Título del evento', {
+                  tagKey: 'eventTitleTag',
+                  fontKey: 'eventTitleFont',
+                  sizeKey: 'eventTitleSize',
+                  defaultTag: 'h3',
+                  defaultSize: 24,
+                  defaultFontHint: style.fontTitle,
+                })}
+                {renderSemanticTextControls('Descripción', {
+                  tagKey: 'eventDescriptionTag',
+                  fontKey: 'eventDescriptionFont',
+                  sizeKey: 'eventDescriptionSize',
+                  defaultTag: 'p',
+                  defaultSize: 14,
+                  defaultFontHint: style.fontBody,
+                })}
+                {renderSemanticTextControls('Fecha', {
+                  tagKey: 'eventDateTag',
+                  fontKey: 'eventDateFont',
+                  sizeKey: 'eventDateSize',
+                  defaultTag: 'h3',
+                  defaultSize: 24,
+                  defaultFontHint: style.fontTitle,
+                })}
+                {renderSemanticTextControls('Horario', {
+                  tagKey: 'eventTimeTag',
+                  fontKey: 'eventTimeFont',
+                  sizeKey: 'eventTimeSize',
+                  defaultTag: 'p',
+                  defaultSize: 13,
+                  defaultFontHint: style.fontBody,
+                })}
+                {renderSemanticTextControls('Chips informativos', {
+                  fontKey: 'eventMetaFont',
+                  sizeKey: 'eventMetaSize',
+                  defaultSize: 11,
+                  defaultFontHint: style.fontBody,
+                })}
+                {renderSemanticTextControls('Texto del botón', {
+                  fontKey: 'eventButtonFont',
+                  sizeKey: 'eventButtonSize',
+                  defaultSize: 14,
+                  defaultFontHint: style.fontTitle,
+                })}
+              </div>
+            )}
             <div>
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Texto del botón</label>
               <input
                 value={block.ctaText ?? ''}
                 onChange={(e) => onChange({ ctaText: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
-                placeholder="Más información"
+                placeholder={block.type === 'event' ? 'Inscribirse' : 'Más información'}
               />
             </div>
             <div>
@@ -3002,6 +3400,150 @@ const BlockEditor: React.FC<{
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── Speaker block ── */}
+        {block.type === 'speaker' && (
+          <>
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Etiqueta superior <span className="font-normal text-gray-400">(opcional)</span></label>
+              <input
+                value={block.content}
+                onChange={(e) => onChange({ content: e.target.value })}
+                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                placeholder="Ej: SPEAKER INVITADO"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Nombre</label>
+              <input
+                value={block.style?.speakerName || ''}
+                onChange={(e) => onChange({ style: { ...block.style, speakerName: e.target.value } })}
+                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                placeholder="Dra. Valentina Rojas"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Cargo</label>
+                <input
+                  value={block.style?.speakerRole || ''}
+                  onChange={(e) => onChange({ style: { ...block.style, speakerRole: e.target.value } })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                  placeholder="Especialista invitada"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Institución</label>
+                <input
+                  value={block.style?.speakerOrg || ''}
+                  onChange={(e) => onChange({ style: { ...block.style, speakerOrg: e.target.value } })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                  placeholder="Hospital Clínico"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Bio breve</label>
+              <textarea
+                value={block.style?.speakerBio || ''}
+                onChange={(e) => onChange({ style: { ...block.style, speakerBio: e.target.value } })}
+                rows={4}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm leading-relaxed focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition resize-none"
+                placeholder="Resumen profesional del speaker y por qué vale la pena escucharlo."
+              />
+            </div>
+            <div className="pt-2 border-t border-gray-100 space-y-2">
+              <label className="block text-[11px] font-semibold text-gray-500">Jerarquía y tipografía del speaker</label>
+              {renderSemanticTextControls('Etiqueta superior', {
+                tagKey: 'speakerLabelTag',
+                fontKey: 'speakerLabelFont',
+                sizeKey: 'speakerLabelSize',
+                defaultTag: 'p',
+                defaultSize: 12,
+                defaultFontHint: style.fontTitle,
+              })}
+              {renderSemanticTextControls('Nombre', {
+                tagKey: 'speakerNameTag',
+                fontKey: 'speakerNameFont',
+                sizeKey: 'speakerNameSize',
+                defaultTag: 'h3',
+                defaultSize: 26,
+                defaultFontHint: style.fontTitle,
+              })}
+              {renderSemanticTextControls('Cargo e institución', {
+                tagKey: 'speakerMetaTag',
+                fontKey: 'speakerMetaFont',
+                sizeKey: 'speakerMetaSize',
+                defaultTag: 'p',
+                defaultSize: 14,
+                defaultFontHint: style.fontBody,
+              })}
+              {renderSemanticTextControls('Biografía', {
+                tagKey: 'speakerBioTag',
+                fontKey: 'speakerBioFont',
+                sizeKey: 'speakerBioSize',
+                defaultTag: 'p',
+                defaultSize: 14,
+                defaultFontHint: style.fontBody,
+              })}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Variante visual</label>
+                <div className="flex gap-1">
+                  {([['classic', 'Classic'], ['spotlight', 'Spotlight']] as const).map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => onChange({ style: { ...block.style, speakerVariant: val } })}
+                      className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${
+                        (block.style?.speakerVariant || 'classic') === val
+                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Forma de imagen</label>
+                <div className="flex gap-1">
+                  {([['circle', 'Circular'], ['rounded', 'Redondeada']] as const).map(([val, label]) => (
+                    <button
+                      key={val}
+                      onClick={() => onChange({ style: { ...block.style, speakerImageShape: val } })}
+                      className={`flex-1 py-1.5 text-[10px] font-semibold rounded-lg border transition ${
+                        (block.style?.speakerImageShape || 'circle') === val
+                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Fondo de tarjeta</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={block.style?.speakerCardBg || '#f8fafc'}
+                    onChange={(e) => onChange({ style: { ...block.style, speakerCardBg: e.target.value } })}
+                    className="w-8 h-8 rounded-lg border border-gray-200 cursor-pointer"
+                  />
+                  <input
+                    value={block.style?.speakerCardBg || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, speakerCardBg: e.target.value } })}
+                    className="flex-1 px-2.5 py-2 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
+                    placeholder="#f8fafc"
+                  />
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {/* ── Quote block ── */}

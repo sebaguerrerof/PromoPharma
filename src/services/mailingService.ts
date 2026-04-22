@@ -201,6 +201,8 @@ export async function suggestBlockCopy(opts: {
       : 'un párrafo de texto para el cuerpo del email (40-80 palabras, claro y directo)',
     bullets: 'una lista de 3-5 puntos clave (un punto por línea, sin viñetas, cada punto máximo 12 palabras)',
     cta: 'un texto de llamada a la acción para un botón (2-4 palabras, verbo imperativo)',
+    event: 'un bloque breve de invitación a evento con foco en inscripción',
+    speaker: 'una breve presentación editorial de un speaker o ponente',
     header: 'un título de encabezado de MÁXIMO 3 PALABRAS (NO más de 3 palabras)',
     hero: 'un título impactante de MÁXIMO 4 PALABRAS para la sección hero',
     footer: 'un texto de pie de email (disclaimer + contacto, 1-2 líneas cortas)',
@@ -228,11 +230,14 @@ export async function suggestBlockCopy(opts: {
   if (blockType === 'bullets') {
     lengthRules.push('6. Un punto por línea, sin viñetas ni guiones al inicio. Cada punto máximo 12 palabras.');
   }
-  if (blockType === 'cta') {
+  if (blockType === 'cta' || blockType === 'event') {
     lengthRules.push('6. Máximo 4 palabras, verbo imperativo. Ejemplos: "Descubrir más", "Ver estudio", "Solicitar muestra".');
   }
   if (blockType === 'text' && !isTitle) {
     lengthRules.push('6. Entre 40 y 80 palabras. Párrafo conciso, profesional, sin relleno.');
+  }
+  if (blockType === 'speaker') {
+    lengthRules.push('6. Tono profesional. Prioriza credenciales, cargo y una breve descripción de valor en 20-50 palabras.');
   }
 
   const prompt = `Eres un redactor experto en marketing farmacéutico para emails profesionales.

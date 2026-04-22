@@ -313,6 +313,8 @@ export type DesignBlockType =
   | 'text'
   | 'image'
   | 'cta'
+  | 'event'
+  | 'speaker'
   | 'footer'
   | 'spacer'
   | 'divider'

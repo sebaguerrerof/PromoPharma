@@ -33,7 +33,7 @@ export type EmailType =
   | 'científico'
   | 'aviso_breve';
 
-export type ContentBlockType = 'hero' | 'text' | 'image' | 'bullets' | 'cta' | 'quote' | 'columns' | 'video' | 'divider';
+export type ContentBlockType = 'hero' | 'text' | 'image' | 'bullets' | 'cta' | 'event' | 'speaker' | 'quote' | 'columns' | 'video' | 'divider';
 
 export interface AIMailingOptions {
   includeHeroImage?: boolean;
@@ -171,7 +171,7 @@ const SYSTEM_RULES = {
   emailWidth: 600,
   emailCompatibility: ['outlook', 'gmail', 'apple_mail'],
   allowedBlockTypes: [
-    'header', 'hero', 'text', 'image', 'cta', 'footer', 'spacer',
+    'header', 'hero', 'text', 'image', 'cta', 'event', 'speaker', 'footer', 'spacer',
     'divider', 'bullets', 'columns', 'quote', 'social', 'video',
   ] as DesignBlockType[],
 };
