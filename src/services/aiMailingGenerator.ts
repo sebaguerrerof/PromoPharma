@@ -85,6 +85,7 @@ export async function generateAIMailing(
 
   // Paso 2: Aplicar estilos de marca (post-proceso local, NO IA)
   response.blocks = applyBrandStylesToBlocks(response.blocks, context.brand);
+  applyStructuredInputsToBlocks(response.blocks, context.options);
 
   // Paso 2.5: Post-proceso de contenido — fix columnas y footer
   for (const b of response.blocks) {
@@ -184,6 +185,39 @@ export async function generateAIMailing(
   return response;
 }
 
+function applyStructuredInputsToBlocks(
+  blocks: MailingBlockContent[],
+  options: AIMailingContext['options'] | undefined,
+): void {
+  if (!options) return;
+
+  const eventDetails = options.eventDetails;
+  const speakerDetails = options.speakerDetails;
+  const joinedEventSpeakers = eventDetails?.speakers && eventDetails.speakers.length > 0
+    ? eventDetails.speakers.join(', ')
+    : undefined;
+
+  if (eventDetails && (eventDetails.date || eventDetails.time || joinedEventSpeakers)) {
+    for (const block of blocks) {
+      if (block.type !== 'event') continue;
+      const s = { ...(block.style || {}) };
+      if (eventDetails.date) s.eventDate = eventDetails.date;
+      if (eventDetails.time) s.eventTime = eventDetails.time;
+      if (joinedEventSpeakers) s.eventSpeaker = joinedEventSpeakers;
+      block.style = s;
+    }
+  }
+
+  if (speakerDetails?.name) {
+    for (const block of blocks) {
+      if (block.type !== 'speaker') continue;
+      const s = { ...(block.style || {}) };
+      s.speakerName = speakerDetails.name;
+      block.style = s;
+    }
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 // SYSTEM PROMPT — Específico para mailing
 // ═══════════════════════════════════════════════════════════
@@ -191,6 +225,8 @@ export async function generateAIMailing(
 function buildMailingSystemPrompt(context: AIMailingContext): string {
   const { brand, claims, insights, availableTemplates, systemRules } = context;
   const promptLower = context.userPrompt.toLowerCase();
+  const eventDetails = context.options?.eventDetails;
+  const speakerDetails = context.options?.speakerDetails;
 
   // Claims agrupados por indicación
   const claimsByIndication = new Map<string, string[]>();
@@ -260,6 +296,16 @@ Respeta este orden. NO agregues bloques de contenido adicionales que no estén e
   const shouldPrioritizeSpeaker = !selectedBlocks?.includes('speaker') && /(speaker|ponente|expositor|charla|webinar|simposio|conferencia|panelista)/i.test(promptLower);
   const speakerInstruction = shouldPrioritizeSpeaker
     ? 'El prompt sugiere que hay un ponente o expositor. Incluye obligatoriamente un bloque speaker dedicado además del bloque event si corresponde.'
+    : '';
+  const eventInputInstruction = eventDetails && (eventDetails.date || eventDetails.time || (eventDetails.speakers && eventDetails.speakers.length > 0))
+    ? `Usa estos datos explícitos del evento en el bloque event (si existe):
+- Fecha: ${eventDetails.date || '(no especificada)'}
+- Hora: ${eventDetails.time || '(no especificada)'}
+- Speaker(s): ${eventDetails.speakers && eventDetails.speakers.length > 0 ? eventDetails.speakers.join(', ') : '(no especificado)'}
+Si falta algún dato, completa solo lo no especificado con valores razonables.`
+    : '';
+  const speakerInputInstruction = speakerDetails?.name
+    ? `Si existe bloque speaker, el campo style.speakerName DEBE ser exactamente: "${speakerDetails.name}".`
     : '';
 
   // TextBank — corpus de textos anteriores de la marca
@@ -334,6 +380,8 @@ ${toneInstruction ? `\n═══ TONO ═══\n${toneInstruction}` : ''}
 ${lengthInstruction ? `\n═══ LONGITUD ═══\n${lengthInstruction}` : ''}
 ${blocksInstruction ? `\n═══ BLOQUES SELECCIONADOS ═══\n${blocksInstruction}` : ''}
 ${speakerInstruction ? `\n═══ HEURÍSTICA DE SPEAKER ═══\n${speakerInstruction}` : ''}
+${eventInputInstruction ? `\n═══ DATOS DE EVENTO INGRESADOS ═══\n${eventInputInstruction}` : ''}
+${speakerInputInstruction ? `\n═══ DATOS DE SPEAKER INGRESADOS ═══\n${speakerInputInstruction}` : ''}
 ${textBankSection}
 
 ═══ FORMATO DE RESPUESTA ═══

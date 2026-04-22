@@ -43,6 +43,14 @@ export interface AIMailingOptions {
   tone?: 'profesional' | 'cercano' | 'académico' | 'urgente';
   length?: 'corto' | 'medio' | 'largo';
   selectedBlocks?: ContentBlockType[];
+  eventDetails?: {
+    date?: string;
+    time?: string;
+    speakers?: string[];
+  };
+  speakerDetails?: {
+    name?: string;
+  };
 }
 
 export interface AIMailingContext {

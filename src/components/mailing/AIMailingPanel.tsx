@@ -80,6 +80,10 @@ const AIMailingPanel: React.FC<AIMailingPanelProps> = ({
   const [emailType, setEmailType] = useState<EmailType | undefined>();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [selectedBlocks, setSelectedBlocks] = useState<ContentBlockType[]>([]);
+  const [eventDate, setEventDate] = useState('');
+  const [eventTime, setEventTime] = useState('');
+  const [eventSpeakersText, setEventSpeakersText] = useState('');
+  const [speakerName, setSpeakerName] = useState('');
   const [options, setOptions] = useState<AIMailingOptions>({
     includeHeroImage: true,
     includeClinicalData: true,
@@ -95,11 +99,32 @@ const AIMailingPanel: React.FC<AIMailingPanelProps> = ({
   const [stepMessage, setStepMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [suggestingPrompt, setSuggestingPrompt] = useState(false);
+  const [showValidationHints, setShowValidationHints] = useState(false);
 
-  const canGenerate = prompt.trim().length > 5;
+  const selectedEvent = selectedBlocks.includes('event');
+  const selectedSpeaker = selectedBlocks.includes('speaker');
+  const parsedSpeakers = eventSpeakersText
+    .split(/\n|,/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const validationErrors = {
+    eventDate: selectedEvent && !eventDate.trim() ? 'La fecha es obligatoria para el bloque Evento.' : '',
+    eventTime: selectedEvent && !eventTime.trim() ? 'La hora es obligatoria para el bloque Evento.' : '',
+    eventSpeakers: selectedEvent && parsedSpeakers.length === 0 ? 'Ingresa al menos un speaker para el Evento.' : '',
+    speakerName: selectedSpeaker && !speakerName.trim() ? 'El nombre es obligatorio para el bloque Speaker.' : '',
+  };
+
+  const hasStructuredErrors = Object.values(validationErrors).some(Boolean);
+  const canGenerate = prompt.trim().length > 5 && !hasStructuredErrors;
 
   const handleGenerate = async () => {
-    if (!canGenerate) return;
+    setShowValidationHints(true);
+    if (hasStructuredErrors) {
+      setError('Completa los campos requeridos de los bloques seleccionados antes de generar.');
+      return;
+    }
+    if (prompt.trim().length <= 5) return;
 
     setGenerating(true);
     setError(null);
@@ -111,6 +136,18 @@ const AIMailingPanel: React.FC<AIMailingPanelProps> = ({
       const contextOptions = {
         ...options,
         selectedBlocks: selectedBlocks.length > 0 ? selectedBlocks : undefined,
+        eventDetails: selectedEvent
+          ? {
+              date: eventDate.trim() || undefined,
+              time: eventTime.trim() || undefined,
+              speakers: parsedSpeakers.length > 0 ? parsedSpeakers : undefined,
+            }
+          : undefined,
+        speakerDetails: selectedSpeaker
+          ? {
+              name: speakerName.trim() || undefined,
+            }
+          : undefined,
       };
       const context = await buildAIMailingContext(
         brand.id,
@@ -334,6 +371,104 @@ const AIMailingPanel: React.FC<AIMailingPanelProps> = ({
                 >
                   Limpiar
                 </button>
+              </div>
+            )}
+
+            {selectedBlocks.includes('event') && (
+              <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3 space-y-2.5">
+                <p className="text-[11px] font-semibold text-blue-800">Datos del bloque Evento</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-blue-700/90 mb-1 block">Fecha</label>
+                    <input
+                      value={eventDate}
+                      onChange={(e) => {
+                        setEventDate(e.target.value);
+                        setError(null);
+                      }}
+                      placeholder="Jueves 12 de junio"
+                      className={`w-full px-2.5 py-1.5 text-xs border rounded-lg bg-white focus:ring-2 focus:border-transparent ${
+                        showValidationHints && validationErrors.eventDate
+                          ? 'border-red-300 focus:ring-red-500'
+                          : 'border-blue-200 focus:ring-blue-500'
+                      }`}
+                    />
+                    {showValidationHints && validationErrors.eventDate && (
+                      <p className="text-[10px] text-red-600 mt-1">{validationErrors.eventDate}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-blue-700/90 mb-1 block">Hora</label>
+                    <input
+                      value={eventTime}
+                      onChange={(e) => {
+                        setEventTime(e.target.value);
+                        setError(null);
+                      }}
+                      placeholder="19:00 h"
+                      className={`w-full px-2.5 py-1.5 text-xs border rounded-lg bg-white focus:ring-2 focus:border-transparent ${
+                        showValidationHints && validationErrors.eventTime
+                          ? 'border-red-300 focus:ring-red-500'
+                          : 'border-blue-200 focus:ring-blue-500'
+                      }`}
+                    />
+                    {showValidationHints && validationErrors.eventTime && (
+                      <p className="text-[10px] text-red-600 mt-1">{validationErrors.eventTime}</p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-blue-700/90 mb-1 block">Speaker o speakers</label>
+                  <textarea
+                    value={eventSpeakersText}
+                    onChange={(e) => {
+                      setEventSpeakersText(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Dra. Ana Pérez\nDr. Juan Soto"
+                    rows={2}
+                    className={`w-full px-2.5 py-1.5 text-xs border rounded-lg bg-white resize-none focus:ring-2 focus:border-transparent ${
+                      showValidationHints && validationErrors.eventSpeakers
+                        ? 'border-red-300 focus:ring-red-500'
+                        : 'border-blue-200 focus:ring-blue-500'
+                    }`}
+                  />
+                  <p className="text-[10px] text-blue-600/80 mt-1">Puedes usar una línea por speaker o separarlos por coma.</p>
+                  {showValidationHints && validationErrors.eventSpeakers && (
+                    <p className="text-[10px] text-red-600 mt-1">{validationErrors.eventSpeakers}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {selectedBlocks.includes('speaker') && (
+              <div className="mt-3 rounded-xl border border-purple-100 bg-purple-50/50 p-3 space-y-2">
+                <p className="text-[11px] font-semibold text-purple-800">Datos del bloque Speaker</p>
+                <div>
+                  <label className="text-[10px] text-purple-700/90 mb-1 block">Nombre del speaker</label>
+                  <input
+                    value={speakerName}
+                    onChange={(e) => {
+                      setSpeakerName(e.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Dra. Valentina Rojas"
+                    className={`w-full px-2.5 py-1.5 text-xs border rounded-lg bg-white focus:ring-2 focus:border-transparent ${
+                      showValidationHints && validationErrors.speakerName
+                        ? 'border-red-300 focus:ring-red-500'
+                        : 'border-purple-200 focus:ring-purple-500'
+                    }`}
+                  />
+                  {showValidationHints && validationErrors.speakerName && (
+                    <p className="text-[10px] text-red-600 mt-1">{validationErrors.speakerName}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showValidationHints && hasStructuredErrors && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                <p className="text-[10px] font-semibold text-red-700">Faltan datos requeridos para los bloques seleccionados.</p>
               </div>
             )}
           </div>
