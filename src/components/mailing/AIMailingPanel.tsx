@@ -65,6 +65,25 @@ interface AIMailingPanelProps {
   onClose: () => void;
 }
 
+// ── Helpers de formato fecha/hora ───────────────────────────────────
+
+function formatEventDateES(isoDate: string): string {
+  if (!isoDate) return '';
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  const parts = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  return parts
+    .replace(/,/g, '')
+    .replace(/^[a-z]/, (c) => c.toUpperCase())
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function formatEventTimeES(hhmm: string): string {
+  if (!hhmm) return '';
+  return `${hhmm} h`;
+}
+
 // ═══════════════════════════════════════════════════════════
 // COMPONENTE
 // ═══════════════════════════════════════════════════════════
@@ -138,8 +157,8 @@ const AIMailingPanel: React.FC<AIMailingPanelProps> = ({
         selectedBlocks: selectedBlocks.length > 0 ? selectedBlocks : undefined,
         eventDetails: selectedEvent
           ? {
-              date: eventDate.trim() || undefined,
-              time: eventTime.trim() || undefined,
+              date: eventDate ? formatEventDateES(eventDate) : undefined,
+              time: eventTime ? formatEventTimeES(eventTime) : undefined,
               speakers: parsedSpeakers.length > 0 ? parsedSpeakers : undefined,
             }
           : undefined,
@@ -381,13 +400,14 @@ const AIMailingPanel: React.FC<AIMailingPanelProps> = ({
                   <div>
                     <label className="text-[10px] text-blue-700/90 mb-1 block">Fecha</label>
                     <input
+                      type="date"
                       value={eventDate}
+                      onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
                       onChange={(e) => {
                         setEventDate(e.target.value);
                         setError(null);
                       }}
-                      placeholder="Jueves 12 de junio"
-                      className={`w-full px-2.5 py-1.5 text-xs border rounded-lg bg-white focus:ring-2 focus:border-transparent ${
+                      className={`w-full px-2.5 py-1.5 text-xs border rounded-lg bg-white focus:ring-2 focus:border-transparent cursor-pointer ${
                         showValidationHints && validationErrors.eventDate
                           ? 'border-red-300 focus:ring-red-500'
                           : 'border-blue-200 focus:ring-blue-500'
@@ -400,13 +420,14 @@ const AIMailingPanel: React.FC<AIMailingPanelProps> = ({
                   <div>
                     <label className="text-[10px] text-blue-700/90 mb-1 block">Hora</label>
                     <input
+                      type="time"
                       value={eventTime}
+                      onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
                       onChange={(e) => {
                         setEventTime(e.target.value);
                         setError(null);
                       }}
-                      placeholder="19:00 h"
-                      className={`w-full px-2.5 py-1.5 text-xs border rounded-lg bg-white focus:ring-2 focus:border-transparent ${
+                      className={`w-full px-2.5 py-1.5 text-xs border rounded-lg bg-white focus:ring-2 focus:border-transparent cursor-pointer ${
                         showValidationHints && validationErrors.eventTime
                           ? 'border-red-300 focus:ring-red-500'
                           : 'border-blue-200 focus:ring-blue-500'

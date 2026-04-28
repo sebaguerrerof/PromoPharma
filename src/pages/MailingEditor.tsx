@@ -1512,9 +1512,10 @@ const DraggableLogo: React.FC<{
   titleFont: string;
   offsetX: number;
   offsetY: number;
+  logoHeight?: number;
   textStyle?: Record<string, string>;
   onDragEnd: (x: number, y: number) => void;
-}> = ({ logoUrl, text, titleFont, offsetX, offsetY, textStyle, onDragEnd }) => {
+}> = ({ logoUrl, text, titleFont, offsetX, offsetY, logoHeight = 42, textStyle, onDragEnd }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ mx: 0, my: 0, ox: offsetX, oy: offsetY });
@@ -1569,7 +1570,7 @@ const DraggableLogo: React.FC<{
       title="Arrastra para reposicionar el logo"
     >
       {logoUrl && (
-        <img src={logoUrl} alt="" style={{ height: 24, width: 'auto', objectFit: 'contain', display: 'block', marginBottom: text ? 8 : 0, pointerEvents: 'none' }} />
+        <img src={logoUrl} alt="" style={{ height: Math.round(logoHeight * 0.57), width: 'auto', objectFit: 'contain', display: 'block', marginBottom: text ? 8 : 0, pointerEvents: 'none' }} />
       )}
       {text && (
         <span style={{
@@ -1688,6 +1689,7 @@ const EmailVisualPreview: React.FC<{
             : { background: `linear-gradient(135deg, ${style.colorPrimary}, ${style.colorSecondary})` };
         const logoX = parseFloat(block.style?.logoX || '0');
         const logoY = parseFloat(block.style?.logoY || '0');
+        const logoHeight = parseInt(block.style?.logoHeight || '42') || 42;
         const hasLogo = !!(block.imageUrl || style.logoUrl);
         return wrapPreview(block.id,
           <div style={headerStyle}>
@@ -1702,6 +1704,7 @@ const EmailVisualPreview: React.FC<{
                 titleFont={titleFont}
                 offsetX={logoX}
                 offsetY={logoY}
+                logoHeight={logoHeight}
                 textStyle={block.style}
                 onDragEnd={(x, y) => {
                   onBlockChange?.(block.id, { style: { ...block.style, logoX: String(Math.round(x)), logoY: String(Math.round(y)) } });
@@ -1910,9 +1913,17 @@ const EmailVisualPreview: React.FC<{
         const eventDate = block.style?.eventDate || 'Jueves 12 de junio';
         const eventTime = block.style?.eventTime || '19:00 h';
         const eventLocation = block.style?.eventLocation || 'Streaming en vivo';
-        const eventSpeaker = block.style?.eventSpeaker || 'Dra. Valentina Rojas';
         const eventCapacity = block.style?.eventCapacity || '120 cupos';
         const eventMode = block.style?.eventMode || 'Online';
+        // Derivar nombres de speakers desde bloques enlazados
+        const linkedSpeakerIds = (block.style?.speakerIds || '').split(',').filter(Boolean);
+        const linkedSpeakerNames = linkedSpeakerIds
+          .map((id) => blocks.find((b) => b.id === id))
+          .filter(Boolean)
+          .map((b) => b!.style?.speakerName || b!.content || 'Speaker');
+        const eventSpeaker = linkedSpeakerNames.length > 0
+          ? linkedSpeakerNames.join(' · ')
+          : (block.style?.eventSpeaker || '');
         const eventLabelTag = block.style?.eventLabelTag;
         const eventTitleTag = block.style?.eventTitleTag;
         const eventDescriptionTag = block.style?.eventDescriptionTag;
@@ -1981,6 +1992,7 @@ const EmailVisualPreview: React.FC<{
         const imageShape = block.style?.speakerImageShape || 'circle';
         const cardBg = block.style?.speakerCardBg || '#f8fafc';
         const speakerVariant = block.style?.speakerVariant || 'classic';
+        const speakerRadius = imageShape === 'circle' ? 999 : imageShape === 'square' ? 0 : 14;
         const speakerBg = speakerVariant === 'spotlight'
           ? `linear-gradient(135deg, ${style.colorPrimary}, ${darkenHex(style.colorPrimary, 0.12)})`
           : cardBg;
@@ -2002,7 +2014,7 @@ const EmailVisualPreview: React.FC<{
         return wrapPreview(block.id,
           <div style={{ padding: '18px 24px' }}>
             <div style={{ background: speakerBg, borderRadius: 16, border: speakerVariant === 'spotlight' ? 'none' : `1px solid ${style.colorPrimary}18`, padding: '18px', display: 'flex', gap: 16, alignItems: 'flex-start' }}>
-              <div style={{ width: speakerVariant === 'spotlight' ? 86 : 64, height: speakerVariant === 'spotlight' ? 86 : 64, borderRadius: imageShape === 'circle' ? 999 : 14, background: speakerVariant === 'spotlight' ? 'rgba(255,255,255,0.12)' : `linear-gradient(135deg, ${style.colorPrimary}22, ${style.colorSecondary}28)`, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: speakerVariant === 'spotlight' ? 86 : 64, height: speakerVariant === 'spotlight' ? 86 : 64, borderRadius: speakerRadius, background: speakerVariant === 'spotlight' ? 'rgba(255,255,255,0.12)' : `linear-gradient(135deg, ${style.colorPrimary}22, ${style.colorSecondary}28)`, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {block.imageUrl ? (
                   <img src={block.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
@@ -2076,11 +2088,31 @@ const EmailVisualPreview: React.FC<{
         };
         const qrUrl = block.style?.footerQrUrl;
         const companyInfo = block.style?.footerCompanyInfo;
+        const fBgColor = block.backgroundColor || '#111117';
+        const fLogoHeight = parseInt(block.style?.footerLogoHeight || '30') || 30;
+        const fLogoX = parseFloat(block.style?.footerLogoX || '0');
+        const fLogoY = parseFloat(block.style?.footerLogoY || '0');
+        const fLogoRaw = block.imageUrl || style.logoUrl;
+        const fLogoUrl = block.style?.footerShowLogo !== 'false' ? fLogoRaw : undefined;
         return wrapPreview(block.id,
           <div>
             <div style={{ height: 2, background: `linear-gradient(90deg, ${style.colorPrimary}, ${style.colorSecondary}, ${style.colorPrimary})` }} />
-            <div style={{ backgroundColor: '#111117', padding: '18px 20px 16px', textAlign: 'center' }}>
-              {style.logoUrl && (<img src={style.logoUrl} alt="" style={{ height: 16, margin: '0 auto 10px', display: 'block', opacity: 0.5 }} />)}
+            <div style={{ backgroundColor: fBgColor, padding: '18px 20px 16px', textAlign: 'center' }}>
+              {fLogoUrl && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+                  <DraggableLogo
+                    logoUrl={fLogoUrl}
+                    text=""
+                    titleFont={bodyFont}
+                    offsetX={fLogoX}
+                    offsetY={fLogoY}
+                    logoHeight={fLogoHeight}
+                    onDragEnd={(x, y) => {
+                      onBlockChange?.(block.id, { style: { ...block.style, footerLogoX: String(Math.round(x)), footerLogoY: String(Math.round(y)) } });
+                    }}
+                  />
+                </div>
+              )}
               {fLinks.length > 0 && (
                 <div style={{ marginBottom: 10 }}>
                   {fLinks.map(({ platform }, idx) => (
@@ -2274,9 +2306,12 @@ const EmailVisualPreview: React.FC<{
   // Check if first block is a header with custom background — if so, skip the top accent strip
   const firstBlock = blocks[0];
   const headerHasCustomBg = firstBlock?.type === 'header' && (firstBlock.backgroundColor || firstBlock.backgroundImage);
+  // Match outer background to footer color to avoid visible strip below footer
+  const lastBlock = blocks[blocks.length - 1];
+  const outerBg = (lastBlock?.type === 'footer' ? lastBlock.backgroundColor : undefined) || '#0d0d11';
 
   return (
-    <div style={{ fontFamily: `'${bodyFont}', Arial, sans-serif`, backgroundColor: '#0d0d11', padding: '0 0 12px' }}>
+    <div style={{ fontFamily: `'${bodyFont}', Arial, sans-serif`, backgroundColor: outerBg, padding: 0 }}>
       {/* Top accent strip — hidden when header has custom bg */}
       {!headerHasCustomBg && (
         <div
@@ -2301,14 +2336,29 @@ const EmailVisualPreview: React.FC<{
           blocks.map((block) => renderBlock(block))
         )}
       </div>
-
-      {/* Unsubscribe line */}
-      <div style={{ textAlign: 'center', padding: '10px 20px 0', fontSize: 7, color: 'rgba(255,255,255,0.2)' }}>
-        Cancelar suscripción
-      </div>
     </div>
   );
 };
+
+// ── Helpers de formato para fecha/hora del evento ─────────
+
+function formatEventDateES(isoDate: string): string {
+  if (!isoDate) return '';
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  const parts = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+  // "jueves, 12 de junio" → "Jueves 12 de junio"
+  return parts
+    .replace(/,/g, '')
+    .replace(/^[a-z]/, (c) => c.toUpperCase())
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function formatEventTimeES(hhmm: string): string {
+  if (!hhmm) return '';
+  return `${hhmm} h`;
+}
 
 // ── Block Editor Panel — Professional ────────────────────
 
@@ -2323,8 +2373,10 @@ const BlockEditor: React.FC<{
 }> = ({ block, style, onChange, tenantId, brand, subject, allBlocks }) => {
   const imgInputRef = useRef<HTMLInputElement>(null);
   const bgImgInputRef = useRef<HTMLInputElement>(null);
+  const qrImgInputRef = useRef<HTMLInputElement>(null);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [uploadingBgImg, setUploadingBgImg] = useState(false);
+  const [uploadingQrImg, setUploadingQrImg] = useState(false);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2357,6 +2409,23 @@ const BlockEditor: React.FC<{
     } finally {
       setUploadingBgImg(false);
       if (bgImgInputRef.current) bgImgInputRef.current.value = '';
+    }
+  };
+
+  const handleQrImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingQrImg(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'png';
+      const path = `mailing/${tenantId}/qr_${Date.now()}.${ext}`;
+      const url = await uploadFile(file, path);
+      onChange({ style: { ...block.style, footerQrImageUrl: url } });
+    } catch {
+      alert('Error al subir el código QR.');
+    } finally {
+      setUploadingQrImg(false);
+      if (qrImgInputRef.current) qrImgInputRef.current.value = '';
     }
   };
 
@@ -2555,9 +2624,129 @@ const BlockEditor: React.FC<{
         {/* ── Footer specific controls ── */}
         {block.type === 'footer' && (
           <>
+            {/* Footer background color */}
+            <div className="pt-2 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-2">Color de fondo del pie de página</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={block.backgroundColor || '#111117'}
+                  onChange={(e) => onChange({ backgroundColor: e.target.value })}
+                  className="w-7 h-7 rounded-lg border border-gray-200 cursor-pointer"
+                />
+                <input
+                  value={block.backgroundColor || ''}
+                  onChange={(e) => onChange({ backgroundColor: e.target.value || undefined })}
+                  placeholder="#111117 (por defecto oscuro)"
+                  className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-[10px] font-mono focus:outline-none focus:border-blue-400"
+                />
+                {block.backgroundColor && (
+                  <button
+                    onClick={() => onChange({ backgroundColor: undefined })}
+                    className="text-[10px] text-gray-400 hover:text-red-500 transition"
+                    title="Restablecer"
+                  >✕</button>
+                )}
+              </div>
+            </div>
+
+            {/* Footer logo size + position */}
+            <div className="pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[11px] font-semibold text-gray-500">Logo del pie de página</label>
+                {(block.imageUrl || style.logoUrl) && (
+                  <button
+                    onClick={() => onChange({ style: { ...block.style, footerShowLogo: block.style?.footerShowLogo === 'false' ? 'true' : 'false' } })}
+                    className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${block.style?.footerShowLogo === 'false' ? 'bg-gray-300' : 'bg-blue-500'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 rounded-full bg-white shadow transition-transform ${block.style?.footerShowLogo === 'false' ? 'translate-x-0.5' : 'translate-x-3.5'}`} />
+                  </button>
+                )}
+              </div>
+
+              {/* Upload / replace logo */}
+              <div className="flex items-center gap-2 mb-2">
+                {block.imageUrl ? (
+                  <>
+                    <img src={block.imageUrl} alt="" className="h-6 max-w-[80px] object-contain rounded border border-gray-200 bg-gray-50" />
+                    <button
+                      onClick={() => imgInputRef.current?.click()}
+                      className="px-2 py-1 rounded-lg border border-gray-200 text-[10px] text-gray-500 hover:border-blue-400 hover:text-blue-500 transition"
+                    >Reemplazar</button>
+                    <button
+                      onClick={() => onChange({ imageUrl: undefined })}
+                      className="text-[10px] text-gray-400 hover:text-red-500 transition"
+                      title="Quitar logo"
+                    >✕</button>
+                  </>
+                ) : style.logoUrl ? (
+                  <>
+                    <img src={style.logoUrl} alt="" className="h-6 max-w-[80px] object-contain rounded border border-gray-200 bg-gray-50 opacity-60" />
+                    <span className="text-[10px] text-gray-400">Logo global</span>
+                    <button
+                      onClick={() => imgInputRef.current?.click()}
+                      className="px-2 py-1 rounded-lg border border-gray-200 text-[10px] text-gray-500 hover:border-blue-400 hover:text-blue-500 transition"
+                    >Usar otro</button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => imgInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-gray-300 text-[10px] text-gray-500 hover:border-blue-400 hover:text-blue-500 transition w-full justify-center"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    Subir logo
+                  </button>
+                )}
+                <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              </div>
+
+              {/* Size + position — only when logo is visible */}
+              {(block.imageUrl || style.logoUrl) && block.style?.footerShowLogo !== 'false' && (<>
+              {/* Size slider */}
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-[10px] text-gray-400 w-16 shrink-0">Tamaño</span>
+                <input
+                  type="range"
+                  min={10}
+                  max={120}
+                  value={parseInt(block.style?.footerLogoHeight || '30') || 30}
+                  onChange={(e) => onChange({ style: { ...block.style, footerLogoHeight: e.target.value } })}
+                  className="flex-1 h-1.5 accent-blue-500"
+                />
+                <span className="text-[10px] text-gray-500 w-8 text-right">{parseInt(block.style?.footerLogoHeight || '30') || 30}px</span>
+              </div>
+              {/* Position X/Y */}
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] text-gray-400 w-16 shrink-0">Posición X</span>
+                <input
+                  type="number"
+                  value={block.style?.footerLogoX || '0'}
+                  onChange={(e) => onChange({ style: { ...block.style, footerLogoX: e.target.value } })}
+                  className="w-20 px-2 py-1 rounded-lg border border-gray-200 text-xs text-center focus:outline-none focus:border-blue-400"
+                />
+                <span className="text-[10px] text-gray-400">px</span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] text-gray-400 w-16 shrink-0">Posición Y</span>
+                <input
+                  type="number"
+                  value={block.style?.footerLogoY || '0'}
+                  onChange={(e) => onChange({ style: { ...block.style, footerLogoY: e.target.value } })}
+                  className="w-20 px-2 py-1 rounded-lg border border-gray-200 text-xs text-center focus:outline-none focus:border-blue-400"
+                />
+                <span className="text-[10px] text-gray-400">px</span>
+              </div>
+              {(block.style?.footerLogoX || block.style?.footerLogoY) && (
+                <button
+                  onClick={() => { const s = { ...block.style }; delete s.footerLogoX; delete s.footerLogoY; onChange({ style: s }); }}
+                  className="text-[10px] text-gray-400 hover:text-red-500 transition"
+                >↺ Centrar logo</button>
+              )}
+              </>)}
+            </div>
+
             {/* Social links for footer */}
             <div className="pt-2 border-t border-gray-100">
-              <label className="block text-[11px] font-semibold text-gray-500 mb-2">Redes sociales del footer</label>
               {(block.socialLinks ?? [{ platform: 'linkedin', url: '' }, { platform: 'instagram', url: '' }, { platform: 'web', url: '' }]).map(
                 (link, idx) => (
                   <div key={idx} className="flex items-center gap-2 mb-2">
@@ -2636,30 +2825,90 @@ const BlockEditor: React.FC<{
 
             {/* QR Code */}
             <div className="pt-2 border-t border-gray-100">
-              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Código QR <span className="font-normal text-gray-400">(opcional)</span></label>
-              <input
-                value={block.style?.footerQrUrl || ''}
-                onChange={(e) => onChange({ style: { ...block.style, footerQrUrl: e.target.value } })}
-                className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
-                placeholder="https://link-del-producto.com"
-              />
-              <p className="text-[10px] text-gray-400 mt-1">Se generará un QR automáticamente con este URL</p>
-              {block.style?.footerQrUrl && (
-                <div className="mt-2 flex items-center gap-3">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(block.style.footerQrUrl)}&bgcolor=111117&color=ffffff`}
-                    alt="QR Preview"
-                    className="w-16 h-16 rounded-lg border border-gray-200"
+              <label className="block text-[11px] font-semibold text-gray-500 mb-2">Código QR <span className="font-normal text-gray-400">(opcional)</span></label>
+
+              {/* Tabs: Generar / Subir */}
+              <div className="flex gap-1 mb-2 p-0.5 bg-gray-100 rounded-lg">
+                {(['generate', 'upload'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => onChange({ style: { ...block.style, footerQrMode: tab } })}
+                    className={`flex-1 py-1 rounded-md text-[10px] font-medium transition ${
+                      (block.style?.footerQrMode || 'generate') === tab
+                        ? 'bg-white shadow text-gray-700'
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {tab === 'generate' ? 'Generar desde URL' : 'Subir imagen'}
+                  </button>
+                ))}
+              </div>
+
+              {(block.style?.footerQrMode || 'generate') === 'generate' ? (
+                <>
+                  <input
+                    value={block.style?.footerQrUrl || ''}
+                    onChange={(e) => onChange({ style: { ...block.style, footerQrUrl: e.target.value } })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
+                    placeholder="https://link-del-producto.com"
                   />
-                  <div>
+                  <p className="text-[10px] text-gray-400 mt-1">Se generará un QR automáticamente con este URL</p>
+                  {block.style?.footerQrUrl && (
+                    <div className="mt-2 flex items-center gap-3">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(block.style.footerQrUrl)}&bgcolor=111117&color=ffffff`}
+                        alt="QR Preview"
+                        className="w-16 h-16 rounded-lg border border-gray-200"
+                      />
+                      <input
+                        value={block.style?.footerQrLabel || ''}
+                        onChange={(e) => onChange({ style: { ...block.style, footerQrLabel: e.target.value } })}
+                        className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
+                        placeholder="Etiqueta QR (ej: Escanea para más info)"
+                      />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  {block.style?.footerQrImageUrl ? (
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={block.style.footerQrImageUrl}
+                        alt="QR"
+                        className="w-16 h-16 rounded-lg border border-gray-200 object-contain bg-white"
+                      />
+                      <div className="flex flex-col gap-1.5">
+                        <button
+                          onClick={() => qrImgInputRef.current?.click()}
+                          className="px-2.5 py-1 rounded-lg border border-gray-200 text-[10px] text-gray-500 hover:border-blue-400 hover:text-blue-500 transition"
+                        >Reemplazar</button>
+                        <button
+                          onClick={() => { const s = { ...block.style }; delete s.footerQrImageUrl; onChange({ style: s }); }}
+                          className="px-2.5 py-1 rounded-lg border border-gray-200 text-[10px] text-gray-400 hover:border-red-300 hover:text-red-500 transition"
+                        >Quitar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => qrImgInputRef.current?.click()}
+                      disabled={uploadingQrImg}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-gray-300 text-[10px] text-gray-500 hover:border-blue-400 hover:text-blue-500 transition w-full justify-center disabled:opacity-50"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      {uploadingQrImg ? 'Subiendo...' : 'Subir imagen del QR'}
+                    </button>
+                  )}
+                  {block.style?.footerQrImageUrl && (
                     <input
                       value={block.style?.footerQrLabel || ''}
                       onChange={(e) => onChange({ style: { ...block.style, footerQrLabel: e.target.value } })}
-                      className="w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
+                      className="mt-2 w-full px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
                       placeholder="Etiqueta QR (ej: Escanea para más info)"
                     />
-                  </div>
-                </div>
+                  )}
+                  <input ref={qrImgInputRef} type="file" accept="image/*" className="hidden" onChange={handleQrImageUpload} />
+                </>
               )}
             </div>
 
@@ -2840,7 +3089,7 @@ const BlockEditor: React.FC<{
             </div>
 
             {/* ── Image display controls ── */}
-            {block.imageUrl && (
+            {block.imageUrl && block.type !== 'speaker' && (
               <div className="pt-3 border-t border-gray-100">
                 <div className="flex items-center gap-2 mb-2.5">
                   <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Visualización</span>
@@ -3072,19 +3321,27 @@ const BlockEditor: React.FC<{
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Fecha</label>
                   <input
-                    value={block.style?.eventDate || ''}
-                    onChange={(e) => onChange({ style: { ...block.style, eventDate: e.target.value } })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
-                    placeholder="Jueves 12 de junio"
+                    type="date"
+                    value={block.style?.eventDateRaw || ''}
+                    onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      onChange({ style: { ...block.style, eventDateRaw: raw, eventDate: formatEventDateES(raw) } });
+                    }}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition cursor-pointer"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Horario</label>
                   <input
-                    value={block.style?.eventTime || ''}
-                    onChange={(e) => onChange({ style: { ...block.style, eventTime: e.target.value } })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
-                    placeholder="19:00 h"
+                    type="time"
+                    value={block.style?.eventTimeRaw || ''}
+                    onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      onChange({ style: { ...block.style, eventTimeRaw: raw, eventTime: formatEventTimeES(raw) } });
+                    }}
+                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition cursor-pointer"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -3096,14 +3353,53 @@ const BlockEditor: React.FC<{
                     placeholder="Auditorio Central o streaming en vivo"
                   />
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Speaker / ponente</label>
-                  <input
-                    value={block.style?.eventSpeaker || ''}
-                    onChange={(e) => onChange({ style: { ...block.style, eventSpeaker: e.target.value } })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
-                    placeholder="Dra. Valentina Rojas"
-                  />
+                <div className="sm:col-span-2">
+                  {(() => {
+                    const speakerBlocks = allBlocks.filter((b) => b.type === 'speaker');
+                    const linkedIds = (block.style?.speakerIds || '').split(',').filter(Boolean);
+                    const toggleSpeaker = (spId: string) => {
+                      const newIds = linkedIds.includes(spId)
+                        ? linkedIds.filter((id) => id !== spId)
+                        : [...linkedIds, spId];
+                      const speakerNames = newIds
+                        .map((id) => allBlocks.find((b) => b.id === id))
+                        .filter(Boolean)
+                        .map((b) => b!.style?.speakerName || b!.content || 'Speaker')
+                        .join(', ');
+                      onChange({ style: { ...block.style, speakerIds: newIds.join(','), eventSpeaker: speakerNames } });
+                    };
+                    return (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-gray-500 mb-2">Speakers del evento</label>
+                        {speakerBlocks.length === 0 ? (
+                          <p className="text-xs text-gray-400 italic px-1">Agrega un bloque <strong>Speaker</strong> al mailing para asociarlo aquí.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {speakerBlocks.map((sp) => {
+                              const isLinked = linkedIds.includes(sp.id);
+                              const spName = sp.style?.speakerName || sp.content || 'Speaker sin nombre';
+                              const spRole = sp.style?.speakerRole || '';
+                              return (
+                                <div key={sp.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border transition ${isLinked ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-xs font-semibold truncate ${isLinked ? 'text-blue-900' : 'text-gray-700'}`}>{spName}</p>
+                                    {spRole && <p className="text-[10px] text-gray-500 truncate">{spRole}</p>}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSpeaker(sp.id)}
+                                    className={`shrink-0 text-[10px] font-semibold px-2.5 py-1 rounded-lg transition ${isLinked ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-white border border-gray-300 text-gray-600 hover:border-blue-400 hover:text-blue-600'}`}
+                                  >
+                                    {isLinked ? 'Quitar' : 'Agregar'}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Cupos</label>
@@ -3326,6 +3622,27 @@ const BlockEditor: React.FC<{
               </button>
             </div>
 
+            {/* Logo size */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">
+                Tamaño del logo
+                <span className="text-[10px] font-normal text-gray-400 ml-1">{parseInt(block.style?.logoHeight || '42') || 42} px</span>
+              </label>
+              <input
+                type="range"
+                min={20}
+                max={160}
+                step={2}
+                value={parseInt(block.style?.logoHeight || '42') || 42}
+                onChange={(e) => onChange({ style: { ...block.style, logoHeight: e.target.value } })}
+                className="w-full accent-blue-500"
+              />
+              <div className="flex justify-between text-[9px] text-gray-300 mt-0.5">
+                <span>20 px</span>
+                <span>160 px</span>
+              </div>
+            </div>
+
             {/* Logo position (drag & drop) */}
             <div className="mt-3 pt-3 border-t border-gray-100">
               <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">
@@ -3510,7 +3827,7 @@ const BlockEditor: React.FC<{
               <div>
                 <label className="block text-[11px] font-semibold text-gray-500 mb-1.5">Forma de imagen</label>
                 <div className="flex gap-1">
-                  {([['circle', 'Circular'], ['rounded', 'Redondeada']] as const).map(([val, label]) => (
+                  {([['circle', 'Redonda'], ['square', 'Cuadrada'], ['rounded', 'Cuadrada redondeada']] as const).map(([val, label]) => (
                     <button
                       key={val}
                       onClick={() => onChange({ style: { ...block.style, speakerImageShape: val } })}

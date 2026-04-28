@@ -127,7 +127,22 @@ export const MailingEmail: React.FC<MailingEmailProps> = ({
   const bodyFont = style.fontBody || 'Inter';
   const titleFont = style.fontTitle || 'Inter';
   const bg = style.colorBackground || '#ffffff';
-  const bodyBg = emailSettings?.bodyBackground || '#0d0d11';
+  // Match body background to footer color (if present) to avoid visible strip below
+  const lastBlock = blocks[blocks.length - 1];
+  const footerBg = lastBlock?.type === 'footer' ? (lastBlock.backgroundColor || '#111117') : undefined;
+  const bodyBg = footerBg || emailSettings?.bodyBackground || '#0d0d11';
+
+  // Enriquecer bloques de evento con nombres de speakers enlazados (siempre frescos)
+  const enrichedBlocks = blocks.map((block) => {
+    if (block.type !== 'event' || !block.style?.speakerIds) return block;
+    const speakerIds = block.style.speakerIds.split(',').filter(Boolean);
+    const names = speakerIds
+      .map((id) => blocks.find((b) => b.id === id))
+      .filter(Boolean)
+      .map((b) => b!.style?.speakerName || b!.content || 'Speaker');
+    if (names.length === 0) return block;
+    return { ...block, style: { ...block.style, eventSpeaker: names.join(' · ') } };
+  });
   const containerW = emailSettings?.containerWidth || layout.width;
   const borderR = emailSettings?.borderRadius ?? 0;
   const preheader = emailSettings?.preheaderText || previewText;
@@ -193,36 +208,17 @@ export const MailingEmail: React.FC<MailingEmailProps> = ({
             overflow: 'hidden',
           }}
         >
-          {blocks.map((block, idx) => (
+          {enrichedBlocks.map((block, idx) => (
             <BlockRenderer
               key={block.id}
               block={block}
               blockIndex={idx}
-              totalBlocks={blocks.length}
+              totalBlocks={enrichedBlocks.length}
               style={style}
               titleFont={titleFont}
               bodyFont={bodyFont}
             />
           ))}
-        </Container>
-
-        {/* ── BOTTOM UNSUBSCRIBE ───────────────────────── */}
-        <Container style={{ maxWidth: containerW, margin: '0 auto', padding: '20px 0 32px' }}>
-          <Text
-            style={{
-              textAlign: 'center',
-              fontSize: 11,
-              color: alpha('#ffffff', 0.3),
-              margin: 0,
-              fontFamily: `'${bodyFont}', Arial, sans-serif`,
-            }}
-          >
-            Si no deseas recibir más correos,{' '}
-            <a href="#" style={{ color: alpha('#ffffff', 0.4), textDecoration: 'underline' }}>
-              cancela tu suscripción
-            </a>
-            .
-          </Text>
         </Container>
       </Body>
     </Html>
@@ -996,7 +992,7 @@ const SpeakerBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont 
   const cardBg = block.style?.speakerCardBg || '#f8fafc';
   const imageShape = block.style?.speakerImageShape || 'circle';
   const speakerVariant = block.style?.speakerVariant || 'classic';
-  const photoRadius = imageShape === 'circle' ? 999 : 18;
+  const photoRadius = imageShape === 'circle' ? 999 : imageShape === 'square' ? 0 : 18;
   const speakerLabelTag = normalizeSemanticTag(block.style?.speakerLabelTag, 'p');
   const speakerNameTag = normalizeSemanticTag(block.style?.speakerNameTag, 'h3');
   const speakerMetaTag = normalizeSemanticTag(block.style?.speakerMetaTag, 'p');
@@ -1183,9 +1179,11 @@ const FooterBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
   const qrLabel = block.style?.footerQrLabel || 'Escanea para más info';
   const companyInfo = block.style?.footerCompanyInfo;
   const footerBgColor = block.backgroundColor || '#111117';
-  const footerLogoUrl = block.imageUrl || style.logoUrl;
-  const footerLogoHeight = parseInt(block.style?.footerLogoHeight || '30');
+  const footerLogoUrl = block.style?.footerShowLogo !== 'false' ? (block.imageUrl || style.logoUrl) : undefined;
+  const footerLogoHeight = parseInt(block.style?.footerLogoHeight || '30') || 30;
   const footerLogoOpacity = parseFloat(block.style?.footerLogoOpacity || '0.6');
+  const footerLogoX = parseFloat(block.style?.footerLogoX || '0');
+  const footerLogoY = parseFloat(block.style?.footerLogoY || '0');
 
   return (
     <Section style={{ padding: 0 }}>
@@ -1215,6 +1213,9 @@ const FooterBlock: React.FC<BlockProps> = ({ block, style, bodyFont }) => {
               display: 'block',
               margin: '0 auto 20px',
               opacity: footerLogoOpacity,
+              position: (footerLogoX !== 0 || footerLogoY !== 0) ? 'relative' : undefined,
+              left: footerLogoX !== 0 ? footerLogoX : undefined,
+              top: footerLogoY !== 0 ? footerLogoY : undefined,
             }}
           />
         )}
