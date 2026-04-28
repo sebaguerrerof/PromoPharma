@@ -1943,6 +1943,10 @@ const EmailVisualPreview: React.FC<{
         const eventTimeSize = Math.max(readSize(block.style?.eventTimeSize, 13) * 0.65, 8);
         const eventMetaSize = Math.max(readSize(block.style?.eventMetaSize, 11) * 0.65, 7);
         const eventButtonSize = Math.max(readSize(block.style?.eventButtonSize, 14) * 0.65, 8);
+        type ScheduleItem = { time: string; activity: string };
+        const eventSchedule: ScheduleItem[] = block.style?.eventSchedule
+          ? (() => { try { return JSON.parse(block.style.eventSchedule); } catch { return []; } })()
+          : [];
         return wrapPreview(block.id,
           <div style={{ background: `linear-gradient(145deg, ${bandColor}, ${darkenHex(bandColor, 0.18)})`, padding: '22px 24px', textAlign: eventAlign, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', right: -18, top: -22, width: 86, height: 86, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)' }} />
@@ -1981,6 +1985,22 @@ const EmailVisualPreview: React.FC<{
                 </span>
               </div>
             </div>
+            {/* Cronograma */}
+            {eventSchedule.length > 0 && (
+              <div style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 12 }}>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: 6 }}>Cronograma</div>
+                {eventSchedule.map((row, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'baseline', paddingBottom: 5 }}>
+                    <span style={{ fontSize: 8, fontWeight: 700, color: 'rgba(255,255,255,0.9)', minWidth: 36, flexShrink: 0, fontFamily: `'${eventTimeFont}', sans-serif` }}>
+                      {row.time ? row.time + ' h' : '—'}
+                    </span>
+                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, fontFamily: `'${bodyFont}', sans-serif` }}>
+                      {row.activity || '–'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>,
         block);
       }
@@ -3418,6 +3438,61 @@ const BlockEditor: React.FC<{
                     className="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition"
                     placeholder="Online, Presencial o Híbrido"
                   />
+                </div>
+
+                {/* ── Cronograma ── */}
+                <div className="sm:col-span-2 pt-2 border-t border-gray-100">
+                  {(() => {
+                    type ScheduleItem = { time: string; activity: string };
+                    const rawSchedule = block.style?.eventSchedule;
+                    const schedule: ScheduleItem[] = rawSchedule ? (() => { try { return JSON.parse(rawSchedule); } catch { return []; } })() : [];
+                    const saveSchedule = (items: ScheduleItem[]) =>
+                      onChange({ style: { ...block.style, eventSchedule: items.length ? JSON.stringify(items) : '' } });
+                    const addRow = () => saveSchedule([...schedule, { time: '', activity: '' }]);
+                    const removeRow = (i: number) => saveSchedule(schedule.filter((_, idx) => idx !== i));
+                    const updateRow = (i: number, field: keyof ScheduleItem, val: string) => {
+                      const next = schedule.map((row, idx) => idx === i ? { ...row, [field]: val } : row);
+                      saveSchedule(next);
+                    };
+                    return (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-[11px] font-semibold text-gray-500">Cronograma <span className="font-normal text-gray-400">(opcional)</span></label>
+                          <button
+                            onClick={addRow}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-semibold hover:bg-blue-100 transition"
+                          >+ Agregar fila</button>
+                        </div>
+                        {schedule.length === 0 ? (
+                          <p className="text-[10px] text-gray-400 italic">Sin cronograma. Haz clic en "+ Agregar fila" para comenzar.</p>
+                        ) : (
+                          <div className="space-y-1.5">
+                            {schedule.map((row, i) => (
+                              <div key={i} className="flex items-center gap-2">
+                                <input
+                                  type="time"
+                                  value={row.time}
+                                  onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                                  onChange={(e) => updateRow(i, 'time', e.target.value)}
+                                  className="w-24 px-2 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400 cursor-pointer"
+                                />
+                                <input
+                                  value={row.activity}
+                                  onChange={(e) => updateRow(i, 'activity', e.target.value)}
+                                  placeholder="Actividad..."
+                                  className="flex-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs focus:outline-none focus:border-blue-400"
+                                />
+                                <button
+                                  onClick={() => removeRow(i)}
+                                  className="text-[10px] text-gray-400 hover:text-red-500 transition shrink-0"
+                                >✕</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}

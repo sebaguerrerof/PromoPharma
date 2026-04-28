@@ -853,6 +853,10 @@ const EventBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont })
   const buttonLabel = block.ctaText || 'Inscribirse';
   const hasCustomBg = !!(block.backgroundImage || block.backgroundColor);
   const metaItems = [eventMode, eventLocation, eventSpeaker, eventCapacity].filter(Boolean);
+  type ScheduleItem = { time: string; activity: string };
+  const eventSchedule: ScheduleItem[] = block.style?.eventSchedule
+    ? (() => { try { return JSON.parse(block.style.eventSchedule); } catch { return []; } })()
+    : [];
   const eventLabelTag = normalizeSemanticTag(block.style?.eventLabelTag, 'p');
   const eventTitleTag = normalizeSemanticTag(block.style?.eventTitleTag, 'h3');
   const eventDescriptionTag = normalizeSemanticTag(block.style?.eventDescriptionTag, 'p');
@@ -976,6 +980,29 @@ const EventBlock: React.FC<BlockProps> = ({ block, style, titleFont, bodyFont })
           </Column>
         </Row>
       </Section>
+
+      {/* Cronograma */}
+      {eventSchedule.length > 0 && (
+        <Section style={{ marginTop: 20, borderTop: `1px solid ${alpha('#ffffff', 0.15)}`, paddingTop: 16 }}>
+          <Text style={{ margin: '0 0 10px', fontSize: 10, color: alpha('#ffffff', 0.5), letterSpacing: '1.5px', textTransform: 'uppercase' as const, fontFamily: `'${bodyFont}', Arial, sans-serif`, fontWeight: 600 }}>
+            Cronograma
+          </Text>
+          {eventSchedule.map((row, i) => (
+            <Row key={i} style={{ marginBottom: 6 }}>
+              <Column style={{ width: 54, verticalAlign: 'top' }}>
+                <Text style={{ margin: 0, fontSize: 11, fontWeight: 700, color: alpha('#ffffff', 0.9), fontFamily: `'${eventTimeFont}', Arial, sans-serif`, lineHeight: '1.5' }}>
+                  {row.time ? row.time + ' h' : '—'}
+                </Text>
+              </Column>
+              <Column style={{ verticalAlign: 'top' }}>
+                <Text style={{ margin: 0, fontSize: 12, color: alpha('#ffffff', 0.78), fontFamily: `'${bodyFont}', Arial, sans-serif`, lineHeight: '1.5' }}>
+                  {row.activity || '–'}
+                </Text>
+              </Column>
+            </Row>
+          ))}
+        </Section>
+      )}
     </Section>
   );
 };
